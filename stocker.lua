@@ -255,7 +255,7 @@ end
 local uiBuffer = nil
 local bufferWidth, bufferHeight = gpu.getResolution()
 
-local function renderUI(search, page, results, startIdx, endIdx, termHeight)
+local function renderUI(search, page, results, startIdx, endIdx, termHeight, debugMode)
   -- Allocate buffer if needed
   local w, h = gpu.getResolution()
   if not uiBuffer or bufferWidth ~= w or bufferHeight ~= h then
@@ -265,93 +265,77 @@ local function renderUI(search, page, results, startIdx, endIdx, termHeight)
   end
   gpu.setActiveBuffer(uiBuffer)
   gpu.fill(1, 1, w, h, " ")
+
   local y = 1
   gpu.setForeground(colors.cyan)
   gpu.set(1, y, "AE2 Autostocker - Search: " .. search .. " | Page "..page)
   y = y + 1
   gpu.setForeground(colors.white)
-  gpu.set(1, y, "Type to search, :n/:p for next/prev page, :q to quit, :r to reload craftables, :s to save levels, :d to toggle debug.")
+  gpu.set(1, y, "Type to search, :n/:p for next/prev page, :q to quit, :r to reload craftables, :s to save levels, :d to toggle debug, :a to show all targets.")
   y = y + 1
   gpu.set(1, y, "Select a craftable by number to set stock level.")
   y = y + 1
   gpu.set(1, y, "----------------------------------------------")
   y = y + 1
-  local visibleResults = {}
-  for i = startIdx, endIdx do
-    local c = results[i]
-    if c then
-      visibleResults[#visibleResults+1] = c
-      local key = c.label .. "|" .. tostring(c.damage)
-      local stock = getCraftableStock(c)
-      local target = stockingLevels[key] or 0
-      local crafting = currentlyCrafting[key] and currentlyCrafting[key].amount or 0
-      local line = string.format("%2d. %-32s ", i, c.label)
-      local x = 1
-      gpu.setForeground(colors.cyan)
-      gpu.set(x, y, string.format("%2d.", i))
-      x = x + 3
-      gpu.setForeground(colors.white)
-      gpu.set(x, y, string.format("%-32s ", c.label))
-      x = x + 33
-      -- Stock color
-      if stock >= target and target > 0 then
-        gpu.setForeground(colors.green)
-      elseif target > 0 then
-        gpu.setForeground(colors.red)
-      else
-        gpu.setForeground(colors.white)
-      end
-      gpu.set(x, y, string.format("[Stock: %d", stock))
-      x = x + #("[Stock: "..stock)
-      gpu.setForeground(colors.white)
-      gpu.set(x, y, " | Target: "..target)
-      x = x + #(" | Target: "..target)
-      if crafting > 0 then
-        gpu.setForeground(colors.yellow)
-        gpu.set(x, y, " | Crafting: "..crafting)
-        x = x + #(" | Crafting: "..crafting)
-        gpu.setForeground(colors.white)
-      else
-        gpu.set(x, y, " | Crafting: 0")
-        x = x + #(" | Crafting: 0")
-      end
-      gpu.set(x, y, "]")
-      gpu.setForeground(colors.white)
+
+  if debugMode then
+    gpu.set(1, y, "[DEBUG MODE ENABLED]")
+    y = y + 1
+    for key, v in pairs(currentlyCrafting) do
+      local label, damage = key:match("^(.-)|(.+)$")
+      local elapsed = os.clock() - (v.startTime or 0)
+      gpu.set(1, y, string.format("%s [%s] x%d | %.1fs", label, damage, v.amount, elapsed))
       y = y + 1
     end
-  end
-  gpu.set(1, y, string.format("-- Page %d/%d --", page, math.max(1, math.ceil(#results / PAGE_SIZE))))
-  y = y + 1
-  gpu.set(1, y, "----------------------------------------------")
-  y = y + 1
-  -- Print tracker below
-  local trackerY = y
-  local trackerList = {}
-  for key, v in pairs(currentlyCrafting) do
-    local label, damage = key:match("^(.-)|(.+)$")
-    local elapsed = os.clock() - (v.startTime or 0)
-    trackerList[#trackerList+1] = {
-      key = key,
-      label = label,
-      damage = damage,
-      amount = v.amount,
-      elapsed = elapsed
-    }
-  end
-  table.sort(trackerList, function(a, b) return a.elapsed > b.elapsed end)
-  gpu.set(1, y, "Active Crafts (oldest first):")
-  y = y + 1
-  gpu.set(1, y, "----------------------------------------------")
-  y = y + 1
-  for i = 1, STATUS_LIMIT do
-    local t = trackerList[i]
-    if t then
-      gpu.set(1, y, string.format("%s [%s] x%d | %.1fs", t.label, t.damage, t.amount, t.elapsed))
-    else
-      gpu.set(1, y, "")
+  else
+    for i = startIdx, endIdx do
+      local c = results[i]
+      if c then
+        local key = c.label .. "|" .. tostring(c.damage)
+        local stock = getCraftableStock(c)
+        local target = stockingLevels[key] or 0
+        local crafting = currentlyCrafting[key] and currentlyCrafting[key].amount or 0
+        local line = string.format("%2d. %-32s ", i, c.label)
+        local x = 1
+        gpu.setForeground(colors.cyan)
+        gpu.set(x, y, string.format("%2d.", i))
+        x = x + 3
+        gpu.setForeground(colors.white)
+        gpu.set(x, y, string.format("%-32s ", c.label))
+        x = x + 33
+        -- Stock color
+        if stock >= target and target > 0 then
+          gpu.setForeground(colors.green)
+        elseif target > 0 then
+          gpu.setForeground(colors.red)
+        else
+          gpu.setForeground(colors.white)
+        end
+        gpu.set(x, y, string.format("[Stock: %d", stock))
+        x = x + #("[Stock: "..stock)
+        gpu.setForeground(colors.white)
+        gpu.set(x, y, " | Target: "..target)
+        x = x + #(" | Target: "..target)
+        if crafting > 0 then
+          gpu.setForeground(colors.yellow)
+          gpu.set(x, y, " | Crafting: "..crafting)
+          x = x + #(" | Crafting: "..crafting)
+          gpu.setForeground(colors.white)
+        else
+          gpu.set(x, y, " | Crafting: 0")
+          x = x + #(" | Crafting: 0")
+        end
+        gpu.set(x, y, "]")
+        gpu.setForeground(colors.white)
+        y = y + 1
+      end
     end
+    gpu.set(1, y, string.format("-- Page %d/%d --", page, math.max(1, math.ceil(#results / PAGE_SIZE))))
+    y = y + 1
+    gpu.set(1, y, "----------------------------------------------")
     y = y + 1
   end
+
   gpu.setActiveBuffer(0)
   gpu.bitblt(0, 1, 1, w, h, uiBuffer, 1, 1)
   -- Move input line to bottom
@@ -405,9 +389,24 @@ local function main()
   local page = 1
   local _, termHeight = term.getViewport()
   local onlyTargets = false
+  local debugMode = false
 
   while true do
-    local results = searchCraftables(search, onlyTargets)
+    local results
+    if onlyTargets then
+      results = {}
+      for key, target in pairs(stockingLevels) do
+        if target and target > 0 then
+          local craftable = craftableLookup[key]
+          if craftable then
+            results[#results+1] = craftable
+          end
+        end
+      end
+    else
+      results = searchCraftables(search, onlyTargets)
+    end
+
     local totalPages = math.max(1, math.ceil(#results / PAGE_SIZE))
     if page > totalPages then page = totalPages end
     if page < 1 then page = 1 end
@@ -415,7 +414,7 @@ local function main()
     local endIdx = math.min(page * PAGE_SIZE, #results)
     if not startIdx or not endIdx or startIdx > endIdx then startIdx, endIdx = 1, 0 end
 
-    renderUI(search, page, results, startIdx, endIdx, termHeight)
+    renderUI(search, page, results, startIdx, endIdx, termHeight, debugMode)
     local input = getInputWithTimeout(termHeight, 1)
 
     if input == nil or input == "" then
@@ -431,8 +430,11 @@ local function main()
     elseif input == ":p" then
       page = page - 1
     elseif input == ":d" then
-      debugEnabled = not debugEnabled
-      print("Debug logging is now", debugEnabled and "enabled" or "disabled")
+      debugMode = not debugMode
+    elseif input == ":a" then
+      onlyTargets = true
+      search = ""
+      page = 1
     elseif input:match("^:t ") then
       onlyTargets = true
       search = input:sub(4)
@@ -440,7 +442,7 @@ local function main()
     elseif tonumber(input) and results[tonumber(input)] then
       local c = results[tonumber(input)]
       local key = c.label .. "|" .. tostring(c.damage)
-      renderUI(search, page, results, startIdx, endIdx, termHeight)
+      renderUI(search, page, results, startIdx, endIdx, termHeight, debugMode)
       term.setCursor(1, termHeight)
       term.clearLine()
       io.write("Set target stock for " .. c.label .. " (current: " .. (stockingLevels[key] or 0) .. ") [amount [batch]]: ")
