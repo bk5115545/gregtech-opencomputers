@@ -19,6 +19,12 @@ local FILES = {
     "stocker.lua",
 }
 
+-- Helper function to escape shell arguments
+local function escapeShellArg(arg)
+    -- In OpenComputers, simple quoting should work for URLs and paths
+    return "'" .. arg:gsub("'", "'\\''") .. "'"
+end
+
 -- Helper function to download a file
 local function downloadFile(filename, targetPath)
     local url = BASE_URL .. filename
@@ -26,9 +32,9 @@ local function downloadFile(filename, targetPath)
     print("  From: " .. url)
     print("  To: " .. targetPath)
     
-    local result, reason = shell.execute("wget -f " .. url .. " " .. targetPath)
+    local result, reason = shell.execute("wget -f " .. escapeShellArg(url) .. " " .. escapeShellArg(targetPath))
     
-    if result == false or result == nil then
+    if not result then
         print("  [ERROR] Failed to download: " .. (reason or "unknown error"))
         return false
     end

@@ -23,9 +23,11 @@ local stockList = {
     -- {name = "minecraft:gold_ingot", damage = 0, count = 64},
 }
 
+-- Monitoring interval in seconds
+local MONITORING_INTERVAL = 30
+
 -- Function to get current item count in ME system
-local function getItemCount(itemName, itemDamage)
-    local items = me.getItemsInNetwork()
+local function getItemCount(items, itemName, itemDamage)
     for _, item in pairs(items) do
         if item.name == itemName and item.damage == itemDamage then
             return item.size
@@ -56,8 +58,11 @@ local function runStocker()
     print("")
     
     while true do
+        -- Cache network items for this monitoring cycle
+        local items = me.getItemsInNetwork()
+        
         for _, item in ipairs(stockList) do
-            local currentCount = getItemCount(item.name, item.damage)
+            local currentCount = getItemCount(items, item.name, item.damage)
             local needed = item.count - currentCount
             
             if needed > 0 then
@@ -70,8 +75,8 @@ local function runStocker()
             end
         end
         
-        -- Wait before checking again (30 seconds)
-        os.sleep(30)
+        -- Wait before checking again
+        os.sleep(MONITORING_INTERVAL)
     end
 end
 
