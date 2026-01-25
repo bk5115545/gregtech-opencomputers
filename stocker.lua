@@ -339,7 +339,7 @@ local function renderUI(search, page, results, startIdx, endIdx, termHeight)
     }
   end
   table.sort(trackerList, function(a, b) return a.elapsed > b.elapsed end)
-  gpu.set(trackerY, y, "Active Crafts (oldest first):")
+  gpu.set(1, y, "Active Crafts (oldest first):")
   y = y + 1
   gpu.set(1, y, "----------------------------------------------")
   y = y + 1
@@ -359,69 +359,80 @@ local function renderUI(search, page, results, startIdx, endIdx, termHeight)
   term.clearLine()
 end
 
-local function getInputWithTimeout(termHeight, timeout, search, page, results, startIdx, endIdx)
-  local inputBuffer = ""
-  local cursorPos = 1
+local function getInputWithTimeout(termHeight, timeout)
+  term.setCursor(1, termHeight)
+  term.clearLine()
+  io.write("> ")
 
-  local function main()
-    load()
-    getAllCraftables()
-    thread.create(requestManagerThread)
-    local search = ""
-    local page = 1
-    local termWidth, termHeight = term.getViewport()
-    local onlyTargets = false
-    local ok, err
-    while true do
-      local results = searchCraftables(search, onlyTargets)
-      local totalPages = math.max(1, math.ceil(#results / PAGE_SIZE))
-      if page > totalPages then page = totalPages end
-      if page < 1 then page = 1 end
-      local startIdx = (page-1)*PAGE_SIZE+1
-      local endIdx = math.min(page*PAGE_SIZE, #results)
-      if not startIdx or not endIdx or startIdx > endIdx then startIdx, endIdx = 1, 0 end
-      renderUI(search, page, results, startIdx, endIdx, termHeight)
-      local input = getInputWithTimeout(termHeight, 1, search, page, results, startIdx, endIdx)
-      if input == ":q" then break
-      elseif input == ":r" then getAllCraftables()
-      elseif input == ":s" then save()
-      elseif input == ":n" then page = page + 1
-      elseif input == ":p" then page = page - 1
-      elseif input == ":d" then debugEnabled = not debugEnabled print("Debug logging is now", debugEnabled and "enabled" or "disabled")
-      elseif input:match("^:t ") then
-        onlyTargets = true
-        search = input:sub(4)
-        page = 1
-      elseif tonumber(input) and results[tonumber(input)] then
-        local c = results[tonumber(input)]
-        local key = c.label .. "|" .. tostring(c.damage)
-        renderUI(search, page, results, startIdx, endIdx, termHeight)
-        term.setCursor(1, termHeight)
-        term.clearLine()
-        io.write("Set target stock for "..c.label.." (current: "..(stockingLevels[key] or 0)..") [amount [batch]]: ")
-        local entry = io.read()
-        local amount, batch = entry:match("^(%d+)%s*(%d*)$")
-        amount = tonumber(amount)
-        batch = tonumber(batch)
-        if amount then
-          stockingLevels[key] = amount
-          if batch and batch > 0 then
-            batchSizes[key] = batch
-          else
-            batchSizes[key] = nil
-          end
-        end
-      else
-        onlyTargets = false
-        search = input or ""
-        page = 1
-      end
+  local buffer = ""
+  local started = os.clock()
+
+  while true do
+    local remaining = timeout - (os.clock() - started)
+    if remaining <= 0 then
+      return nil
     end
-    if uiBuffer then pcall(gpu.freeBuffer, uiBuffer) end
-    save()
+
+    local ev = {event.pull(remaining, "key_down")}
+    if #ev == 0 then
+      return nil
+    end
+
+    local _, _, char, code = table.unpack(ev)
+    if code == keyboard.keys.enter then
+      term.clearLine()
+      return buffer
+    elseif code == keyboard.keys.back then
+      if #buffer > 0 then
+        buffer = buffer:sub(1, -2)
+        term.clearLine()
+        io.write("> " .. buffer)
+      end
+    elseif char and char >= 32 and char <= 126 then
+      local ch = string.char(char)
+      buffer = buffer .. ch
+      io.write(ch)
+    end
   end
-    elseif input == ":p" then page = page - 1
-    elseif input == ":d" then debugEnabled = not debugEnabled print("Debug logging is now", debugEnabled and "enabled" or "disabled")
+end
+
+local function main()
+  load()
+  getAllCraftables()
+  thread.create(requestManagerThread)
+
+  local search = ""
+  local page = 1
+  local _, termHeight = term.getViewport()
+  local onlyTargets = false
+
+  while true do
+    local results = searchCraftables(search, onlyTargets)
+    local totalPages = math.max(1, math.ceil(#results / PAGE_SIZE))
+    if page > totalPages then page = totalPages end
+    if page < 1 then page = 1 end
+    local startIdx = (page - 1) * PAGE_SIZE + 1
+    local endIdx = math.min(page * PAGE_SIZE, #results)
+    if not startIdx or not endIdx or startIdx > endIdx then startIdx, endIdx = 1, 0 end
+
+    renderUI(search, page, results, startIdx, endIdx, termHeight)
+    local input = getInputWithTimeout(termHeight, 1)
+
+    if input == nil or input == "" then
+      -- No input; refresh UI and continue
+    elseif input == ":q" then
+      break
+    elseif input == ":r" then
+      getAllCraftables()
+    elseif input == ":s" then
+      save()
+    elseif input == ":n" then
+      page = page + 1
+    elseif input == ":p" then
+      page = page - 1
+    elseif input == ":d" then
+      debugEnabled = not debugEnabled
+      print("Debug logging is now", debugEnabled and "enabled" or "disabled")
     elseif input:match("^:t ") then
       onlyTargets = true
       search = input:sub(4)
@@ -432,7 +443,7 @@ local function getInputWithTimeout(termHeight, timeout, search, page, results, s
       renderUI(search, page, results, startIdx, endIdx, termHeight)
       term.setCursor(1, termHeight)
       term.clearLine()
-      io.write("Set target stock for "..c.label.." (current: "..(stockingLevels[key] or 0)..") [amount [batch]]: ")
+      io.write("Set target stock for " .. c.label .. " (current: " .. (stockingLevels[key] or 0) .. ") [amount [batch]]: ")
       local entry = io.read()
       local amount, batch = entry:match("^(%d+)%s*(%d*)$")
       amount = tonumber(amount)
@@ -451,6 +462,8 @@ local function getInputWithTimeout(termHeight, timeout, search, page, results, s
       page = 1
     end
   end
+
+  if uiBuffer then pcall(gpu.freeBuffer, uiBuffer) end
   save()
 end
 
