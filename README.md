@@ -25,15 +25,6 @@ An Applied Energistics auto-stocker that maintains stock levels of items in your
 1. Edit `stocker.lua` to configure which items to stock
 2. Run: `/home/stocker.lua`
 
-**Configuration Example:**
-```lua
-local stockList = {
-    {name = "minecraft:iron_ingot", damage = 0, count = 64},
-    {name = "minecraft:gold_ingot", damage = 0, count = 64},
-    {name = "gregtech:gt.metaitem.01", damage = 32600, count = 16}, -- Example GregTech item
-}
-```
-
 ## Manual Installation
 
 If you prefer to install scripts manually:
