@@ -275,7 +275,7 @@ local function requestManagerThread()
               addDebugLog("Dispatching craft for " .. key .. ", amount: " .. toRequest)
               -- Dispatch craft logic here
               local batch = batchSizes[key]
-              local reqAmount = batch and batch > 0 or toRequest
+              local reqAmount = (batch and batch > 0) and batch or toRequest
               local ok, req = pcall(craftable.request, reqAmount)
               os.sleep(0.060)
 
