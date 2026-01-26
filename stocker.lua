@@ -576,10 +576,9 @@ local function getInputWithTimeout(termHeight, timeout)
   end
 end
 
-local function main()
+local function runMainLoop()
   load()
   getAllCraftables()
-  local managerThread = thread.create(requestManagerThread)
 
   local search = ""
   local page = 1
@@ -646,11 +645,19 @@ local function main()
       bufferDirtyFlags.craftable = true
     end
   end
+end
 
+local function main()
+  local managerThread = thread.create(requestManagerThread)
+  local success, err = pcall(runMainLoop, managerThread)
+  if not success then
+    print("An error occurred: " .. tostring(err))
+  end
+
+  -- Cleanup
   if managerThread and managerThread:status() == "running" then
     managerThread:kill() -- Terminate the thread to prevent hanging
   end
-
   gpu.freeAllBuffers() -- Frees all buffers and resets the buffer index to 0
   save()
 end
