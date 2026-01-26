@@ -363,30 +363,31 @@ local function renderCraftableData(results, startIdx, endIdx, page)
       local target = stockingLevels[key] or 0
       local crafting = currentlyCrafting[key] and currentlyCrafting[key].amount or 0
 
-      -- Set color for stock
-      if target == 0 then
-        gpu.setForeground(colors.white) -- No target, set text to white
-      elseif stock >= target then
-        gpu.setForeground(colors.red)
-      else
-        gpu.setForeground(colors.green)
-      end
-      local stockText = string.format("Stock: %d", stock)
-      gpu.set(1, y, stockText)
-
-      -- Set color for target
-      gpu.setForeground(target == 0 and colors.white or colors.yellow) -- White if no target, otherwise yellow
-      local targetText = string.format(" | Target: %d", target)
-      gpu.set(1 + #stockText, y, targetText)
-
-      -- Set color for crafting
-      gpu.setForeground(colors.cyan)
-      local craftingText = string.format(" | Crafting: %d", crafting)
-      gpu.set(1 + #stockText + #targetText, y, craftingText)
-
-      -- Reset color and print label
+      -- Print label
       gpu.setForeground(colors.white)
-      gpu.set(1, y, string.format("%2d. %-20s", i, c.label))
+      local labelText = string.format("%2d. %-20s", i, c.label)
+      gpu.set(1, y, labelText)
+
+      -- Print stock
+      local stockText = string.format("[Stock: %d", stock)
+      if target == 0 then
+        gpu.setForeground(colors.white)
+      elseif stock >= target then
+        gpu.setForeground(colors.green)
+      else
+        gpu.setForeground(colors.red)
+      end
+      gpu.set(24, y, stockText)
+
+      -- Print target
+      gpu.setForeground(target == 0 and colors.white or colors.yellow)
+      local targetText = string.format(" | Target: %d", target)
+      gpu.set(40, y, targetText)
+
+      -- Print crafting
+      gpu.setForeground(colors.cyan)
+      local craftingText = string.format(" | Crafting: %d]", crafting)
+      gpu.set(60, y, craftingText)
 
       y = y + 1
     end
@@ -405,6 +406,9 @@ local function renderCraftingStatus()
   y = y + 1
   gpu.set(1, y, "----------------------------------------------")
   y = y + 1
+
+  addDebugLog("Number of items in currentlyCrafting: " .. tostring(#currentlyCrafting))
+
   for key, v in pairs(currentlyCrafting) do
     local label, damage = key:match("^(.-)|(.+)$")
     local elapsed = os.clock() - (v.startTime or 0)
