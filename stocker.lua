@@ -493,7 +493,7 @@ end
 local function main()
   load()
   getAllCraftables()
-  thread.create(requestManagerThread)
+  local managerThread = thread.create(requestManagerThread)
 
   local search = ""
   local page = 1
@@ -504,8 +504,7 @@ local function main()
     local results
 
     if debugEnabled then
-      -- if debug mode, always blit the debug buffer
-      bufferDirtyFlags.debug = true
+      bufferDirtyFlags.debug = true -- Force debug buffer to be dirty in debug mode
     end
 
     if onlyTargets then
@@ -589,7 +588,11 @@ local function main()
     end
   end
 
-  if uiBuffer then pcall(gpu.freeBuffer, uiBuffer) end
+  if managerThread and managerThread:status() == "running" then
+    managerThread:kill() -- Terminate the thread to prevent hanging
+  end
+
+  gpu.freeAllBuffers() -- Frees all buffers and resets the buffer index to 0
   save()
 end
 
