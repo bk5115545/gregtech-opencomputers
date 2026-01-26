@@ -480,11 +480,11 @@ local function renderUI(search, page, results, startIdx, endIdx, termHeight, inp
   end
 
   -- Render crafting status (right half)
-  if bufferDirtyFlags.craftingStatus then
+  -- if bufferDirtyFlags.craftingStatus then
     renderCraftingStatus()
     gpu.bitblt(0, craftableWidth + 1, headerHeight, craftingStatusWidth, craftingStatusHeight, craftingStatusBuffer, 1, 1)
     bufferDirtyFlags.craftingStatus = false
-  end
+  -- end
 
   -- Render debug info
   if bufferDirtyFlags.debug then
