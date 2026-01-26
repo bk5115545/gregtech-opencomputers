@@ -625,6 +625,26 @@ local function runMainLoop()
 
     if input == nil or input == "" then
       -- No input; refresh UI and continue
+    elseif tonumber(input) and results[tonumber(input)] then
+      local c = results[tonumber(input)]
+      local key = c.label .. "|" .. tostring(c.damage)
+      renderUI(search, page, results, startIdx, endIdx, termHeight, debugLogs)
+      term.setCursor(1, termHeight)
+      term.clearLine()
+      io.write("Set target stock for " .. c.label .. " (current: " .. (stockingLevels[key] or 0) .. ") [amount [batch]]: ")
+      local entry = io.read()
+      local amount, batch = entry:match("^(%d+)%s*(%d*)$")
+      amount = tonumber(amount)
+      batch = tonumber(batch)
+      if amount then
+        stockingLevels[key] = amount
+        if batch and batch > 0 then
+          batchSizes[key] = batch
+        else
+          batchSizes[key] = nil
+        end
+      end
+      bufferDirtyFlags.craftable = true -- Mark craftable buffer dirty when stock levels change
     elseif input == ":q" then
       break
     elseif input == ":r" then
