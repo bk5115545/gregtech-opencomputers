@@ -36,6 +36,14 @@ local colors = {
   cyan = 0x00FFFF
 }
 
+bufferDirtyFlags = {
+  header = true,
+  craftable = true,
+  craftingStatus = true,
+  debug = true,
+  input = true
+}
+
 component.gpu.setResolution(160, 50)
 
 local function save()
