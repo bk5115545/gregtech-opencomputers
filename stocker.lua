@@ -234,19 +234,18 @@ local function requestManagerThread()
         local craftable = craftableLookup[key]
         if not craftable then
           addDebugLog("No craftable found for key: " .. key)
-          bufferDirtyFlags.craftingStatus = true
         else
           local stock = getCraftableStock(craftable)
           local crafting = currentlyCrafting[key] and currentlyCrafting[key].amount or 0
-          addDebugLog("Found craftable for key: " .. key .. ", Stock: " .. stock .. ", Target: " .. target)
+          addDebugLog("Found pattern for key: " .. key .. ", Stock: " .. stock .. ", Target: " .. target)
           local toRequest = target - (stock + crafting)
           if toRequest > 0 and not currentlyCrafting[key] then
             -- Check cooldown
             local cooldown = craftCooldowns[key] or 0
             if now < cooldown then
-              addDebugLog("Cooldown active for " .. key .. " until " .. cooldown)
+              addDebugLog("Cooldown active for " .. key .. " until " .. cooldown, "cooldown")
             else
-              addDebugLog("Dispatching craft for " .. key .. ", amount: " .. toRequest, "success")
+              addDebugLog("Dispatching craft for " .. key .. ", amount: " .. toRequest)
               -- Dispatch craft logic here
               local batch = batchSizes[key]
               local reqAmount = batch and batch > 0 and math.min(batch, toRequest) or toRequest
@@ -272,7 +271,6 @@ local function requestManagerThread()
                 local delay = math.min(10 * fails, 60)
                 craftCooldowns[key] = now + delay
                 addDebugLog("Request error for: " .. tostring(key) .. ", " .. tostring(req) .. ", Cooldown: " .. delay .. "s", "failure")
-                bufferDirtyFlags.craftingStatus = true
               end
             end
           end
@@ -282,6 +280,7 @@ local function requestManagerThread()
     end
     for key, v in pairs(currentlyCrafting) do
       if v.tracker.isCanceled() or v.tracker.isDone() then
+        bufferDirtyFlags.craftingStatus = true
         currentlyCrafting[key] = nil
         -- Invalidate stock cache for this item
         local craftable = craftableLookup[key]
@@ -290,7 +289,6 @@ local function requestManagerThread()
           stockCache[cacheKey] = nil
         end
         addDebugLog("Craft finished/canceled for: " .. key, "success")
-        bufferDirtyFlags.craftingStatus = true
       end
     end
     addDebugLog("Sleeping...")
@@ -363,13 +361,15 @@ local function renderCraftableData(results, startIdx, endIdx, page)
       local target = stockingLevels[key] or 0
       local crafting = currentlyCrafting[key] and currentlyCrafting[key].amount or 0
 
-      -- Print label
+      -- Print label with increased width
       gpu.setForeground(colors.white)
-      local labelText = string.format("%2d. %-20s", i, c.label)
+      local labelText = string.format("%2d. %-30s", i, c.label) -- Increased width to 30 characters
+      labelText = labelText .. string.rep(" ", 32 - #labelText) -- Pad with spaces to clear leftover characters
       gpu.set(1, y, labelText)
 
-      -- Print stock
-      local stockText = string.format("[Stock: %d", stock)
+      -- Print stock with short name (S)
+      local stockText = string.format("[S: %d", stock)
+      stockText = stockText .. string.rep(" ", 10 - #stockText) -- Pad with spaces
       if target == 0 then
         gpu.setForeground(colors.white)
       elseif stock >= target then
@@ -377,17 +377,19 @@ local function renderCraftableData(results, startIdx, endIdx, page)
       else
         gpu.setForeground(colors.red)
       end
-      gpu.set(24, y, stockText)
+      gpu.set(34, y, stockText) -- Adjusted position for increased label width
 
-      -- Print target
+      -- Print target with short name (T)
       gpu.setForeground(target == 0 and colors.white or colors.yellow)
-      local targetText = string.format(" | Target: %d", target)
-      gpu.set(40, y, targetText)
+      local targetText = string.format(" | T: %d", target)
+      targetText = targetText .. string.rep(" ", 12 - #targetText) -- Pad with spaces
+      gpu.set(46, y, targetText) -- Adjusted position for increased label width
 
-      -- Print crafting
+      -- Print crafting with short name (C)
       gpu.setForeground(colors.cyan)
-      local craftingText = string.format(" | Crafting: %d]", crafting)
-      gpu.set(60, y, craftingText)
+      local craftingText = string.format(" | C: %d]", crafting)
+      craftingText = craftingText .. string.rep(" ", 14 - #craftingText) -- Pad with spaces
+      gpu.set(58, y, craftingText) -- Adjusted position for increased label width
 
       y = y + 1
     end
@@ -584,8 +586,10 @@ local function main()
       save()
     elseif input == ":n" then
       page = page + 1
+      bufferDirtyFlags.craftable = true
     elseif input == ":p" then
       page = page - 1
+      bufferDirtyFlags.craftable = true
     elseif input == ":d" then
       debugEnabled = not debugEnabled
       debugLogs = {}
@@ -593,12 +597,12 @@ local function main()
       onlyTargets = not onlyTargets
       search = ""
       page = 1
-      bufferDirtyFlags.craftable = true -- Mark craftable buffer dirty when toggling target view
+      bufferDirtyFlags.craftable = true
     elseif input:match("^:t ") then
       onlyTargets = true
       search = input:sub(4)
       page = 1
-      bufferDirtyFlags.craftable = true -- Mark craftable buffer dirty when searching targets
+      bufferDirtyFlags.craftable = true
     elseif tonumber(input) and results[tonumber(input)] then
       local c = results[tonumber(input)]
       local key = c.label .. "|" .. tostring(c.damage)
