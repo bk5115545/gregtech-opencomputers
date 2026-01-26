@@ -239,6 +239,7 @@ local craftFailures = {}
 local function requestManagerThread()
   while true do
     local now = os.clock()
+
     for key, target in pairs(stockingLevels) do
       if target and target > 0 then
         local craftable = craftableLookup[key]
@@ -246,6 +247,8 @@ local function requestManagerThread()
           addDebugLog("No craftable found for key: " .. key)
         else
           local stock = getCraftableStock(craftable)
+          os.sleep(0.060)
+
           local crafting = currentlyCrafting[key] and currentlyCrafting[key].amount or 0
           addDebugLog("Found pattern for key: " .. key .. ", Stock: " .. stock .. ", Target: " .. target)
           local toRequest = target - (stock + crafting)
@@ -260,6 +263,8 @@ local function requestManagerThread()
               local batch = batchSizes[key]
               local reqAmount = batch and batch > 0 and math.min(batch, toRequest) or toRequest
               local ok, req = pcall(craftable.request, reqAmount)
+              os.sleep(0.060)
+
               addDebugLog("Request result: " .. tostring(ok) .. ", " .. tostring(req), ok and "success" or "failure")
               if ok and req then
                 bufferDirtyFlags.craftingStatus = true
@@ -286,10 +291,12 @@ local function requestManagerThread()
             end
           end
         end
-        os.sleep(0.025) -- Sleep for 25ms between processing each craftable
       end
     end
+    
+    
     for key, v in pairs(currentlyCrafting) do
+      os.sleep(0.060)
       if v.tracker.isCanceled() or v.tracker.isDone() then
         bufferDirtyFlags.craftingStatus = true
         currentlyCrafting[key] = nil
@@ -302,6 +309,7 @@ local function requestManagerThread()
         addDebugLog("Craft finished/canceled for: " .. key, "success")
       end
     end
+
     addDebugLog("Sleeping...")
     os.sleep(10) -- Slow down craft progress checks
   end
