@@ -651,7 +651,10 @@ local function main()
   local managerThread = thread.create(requestManagerThread)
   local success, err = pcall(runMainLoop, managerThread)
   if not success then
-    print("An error occurred: " .. tostring(err))
+    term.setCursor(1, gpu.getResolution())
+    term.clearLine()
+    io.write("An error occurred: " .. tostring(err))
+    io.read()
   end
 
   -- Cleanup
