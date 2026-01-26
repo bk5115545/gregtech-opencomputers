@@ -436,7 +436,7 @@ local function renderCraftingStatus()
 
   -- Header for columns
   gpu.setForeground(colors.cyan)
-  gpu.set(1, y, string.format("%-30s %-10s %-10s", "Item", "Amount", "Elapsed"))
+  gpu.set(1, y, string.format("%-36s %-10s %-10s", "Item", "Amount", "Elapsed"))
   y = y + 1
   gpu.set(1, y, "----------------------------------------------")
   y = y + 1
@@ -454,7 +454,7 @@ local function renderCraftingStatus()
     end
 
     -- Print aligned columns
-    gpu.set(1, y, string.format("%-30s %-10d %-10.1fs", v.label, v.amount, elapsed))
+    gpu.set(1, y, string.format("%-36s %-10d %-10.1fs", label, v.amount, elapsed))
     y = y + 1
 
     if y > craftingStatusHeight then break end -- Prevent overflow
@@ -465,6 +465,10 @@ end
 
 local function renderDebugInfo(debugLogs)
   clearBuffer(debugBuffer, debugWidth, debugHeight)
+  if debugEnabled == false then
+    return
+  end
+
   gpu.setActiveBuffer(debugBuffer)
 
   local y = 1

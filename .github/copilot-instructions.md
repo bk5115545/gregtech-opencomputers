@@ -32,7 +32,7 @@ This repository contains Lua scripts designed for use with the OpenComputers mod
 ## Project-Specific Conventions
 - Scripts should be written in Lua and follow Lua best practices.
 - Use descriptive variable and function names to improve readability.
-- Include comments to explain the purpose and functionality of code sections.
+- Include comments to explain the purpose and functionality of code sections, but avoid adding comments to the end of lines solely to explain changes.
 - Ensure compatibility with the OpenComputers API and the GregTech New Horizons modpack.
 
 ## Integration Points
