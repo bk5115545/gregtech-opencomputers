@@ -359,7 +359,7 @@ local function renderHeader(search, page)
   gpu.setForeground(colors.white)
   gpu.set(1, y, "Type to search, :n/:p for next/prev page, :q to quit, :r to reload craftables, :s to save levels, :d to toggle debug, :a to show all targets.")
   y = y + 1
-  gpu.set(1, y, "Select a craftable by number to set stock level.")
+  gpu.set(1, y, string.format("%-43s %-10s %-10s %-10s", "Item", "Stock", "Target", "Crafting"))
   y = y + 1
   gpu.set(1, y, "----------------------------------------------")
 end
@@ -383,9 +383,8 @@ local function renderCraftableData(results, startIdx, endIdx, page)
       labelText = labelText .. string.rep(" ", 45 - #labelText) -- Pad with spaces to clear leftover characters
       gpu.set(1, y, labelText)
 
-      -- Print stock with suffix and short name (S)
-      local stockText = string.format("[S: %s", formatNumberWithSuffix(stock))
-      stockText = stockText .. string.rep(" ", 10 - #stockText) -- Pad with spaces
+      -- Print stock with suffix
+      local stockText = string.format("%-10s", formatNumberWithSuffix(stock))
       if target == 0 then
         gpu.setForeground(colors.white)
       elseif stock >= target then
@@ -393,19 +392,17 @@ local function renderCraftableData(results, startIdx, endIdx, page)
       else
         gpu.setForeground(colors.red)
       end
-      gpu.set(34, y, stockText)
+      gpu.set(45, y, stockText)
 
-      -- Print target with suffix and short name (T)
+      -- Print target with suffix
       gpu.setForeground(target == 0 and colors.white or colors.yellow)
-      local targetText = string.format(" | T: %s", formatNumberWithSuffix(target))
-      targetText = targetText .. string.rep(" ", 12 - #targetText) -- Pad with spaces
-      gpu.set(46, y, targetText)
+      local targetText = string.format("%-10s", formatNumberWithSuffix(target))
+      gpu.set(56, y, targetText)
 
-      -- Print crafting with suffix and short name (C)
+      -- Print crafting with suffix
       gpu.setForeground(colors.cyan)
-      local craftingText = string.format(" | C: %s]", formatNumberWithSuffix(crafting))
-      craftingText = craftingText .. string.rep(" ", 20 - #craftingText) -- Pad with spaces
-      gpu.set(58, y, craftingText)
+      local craftingText = string.format("%-10s", formatNumberWithSuffix(crafting))
+      gpu.set(67, y, craftingText)
 
       y = y + 1
     end
@@ -450,9 +447,9 @@ local function renderCraftingStatus()
     gpu.setForeground(colors.white)
     gpu.set(1, y, string.format("%-36s", label))
 
-    -- Render amount in green
+    -- Render amount with suffix in green
     gpu.setForeground(colors.green)
-    gpu.set(38, y, string.format("%-10d", v.amount))
+    gpu.set(38, y, string.format("%-10s", formatNumberWithSuffix(v.amount)))
 
     -- Render elapsed time in red if > 60s, otherwise yellow
     if elapsed > 60 then
