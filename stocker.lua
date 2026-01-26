@@ -15,7 +15,7 @@ local currentlyCrafting = {}
 local craftableLookup = {}
 
 local PAGE_SIZE = 25
-local CRAFTABLE_LIMIT = 400 -- Set higher for real use, lower for debug
+local CRAFTABLE_LIMIT = 9999 -- Set higher for real use, lower for debug
 
 local STATUS_LIMIT = 10
 local lastInputTime = os.clock()
@@ -236,10 +236,8 @@ local function requestManagerThread()
             local cooldown = craftCooldowns[key] or 0
             if now < cooldown then
               addDebugLog("Cooldown active for " .. key .. " until " .. cooldown)
-              bufferDirtyFlags.craftingStatus = true
             else
               addDebugLog("Dispatching craft for " .. key .. ", amount: " .. toRequest)
-              bufferDirtyFlags.craftingStatus = true
               -- Dispatch craft logic here
               local batch = batchSizes[key]
               local reqAmount = batch and batch > 0 and math.min(batch, toRequest) or toRequest
@@ -257,7 +255,8 @@ local function requestManagerThread()
                     craftCooldowns[key] = nil
                   end
                 end
-                addDebugLog("Craft started for:", key)
+                bufferDirtyFlags.craftingStatus = true
+                addDebugLog("Craft started for: " .. tostring(key))
               elseif not ok then
                 -- Failure: set cooldown
                 local fails = (craftFailures[key] or 0) + 1
@@ -265,7 +264,6 @@ local function requestManagerThread()
                 local delay = math.min(10 * fails, 60)
                 craftCooldowns[key] = now + delay
                 addDebugLog("Request error for:", key, req, "Cooldown:", delay, "s")
-                bufferDirtyFlags.craftingStatus = true
               end
             end
           end
@@ -301,15 +299,15 @@ local function initializeBuffers()
   headerBuffer = gpu.allocateBuffer(headerWidth, headerHeight)
 
   -- Craftables Buffer (Left Half)
-  craftableWidth, craftableHeight = math.floor(w / 2), h - 8
+  craftableWidth, craftableHeight = math.floor(w / 2), h - 12
   craftableBuffer = gpu.allocateBuffer(craftableWidth, craftableHeight)
 
   -- Crafting Status Buffer (Right Half)
-  craftingStatusWidth, craftingStatusHeight = math.ceil(w / 2), h - 8
+  craftingStatusWidth, craftingStatusHeight = math.ceil(w / 2), h - 12
   craftingStatusBuffer = gpu.allocateBuffer(craftingStatusWidth, craftingStatusHeight)
 
   -- Debug Info Buffer
-  debugWidth, debugHeight = w, 5
+  debugWidth, debugHeight = w, 10 -- Increased height for debug logs
   debugBuffer = gpu.allocateBuffer(debugWidth, debugHeight)
 
   -- Input Bar Buffer
