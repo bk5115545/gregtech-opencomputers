@@ -262,7 +262,7 @@ local function requestManagerThread()
               local ok, req = pcall(craftable.request, reqAmount)
               addDebugLog("Request result: " .. tostring(ok) .. ", " .. tostring(req), ok and "success" or "failure")
               if ok and req then
-                bufferDirtyFlags.craftingStatus = true
+                event.push("craftingStatusUpdated") -- Signal the main thread
                 currentlyCrafting[key] = {tracker = req, amount = reqAmount, startTime = os.clock()}
                 craftFailures[key] = 0
                 -- Gradually reduce cooldown
@@ -291,7 +291,7 @@ local function requestManagerThread()
     end
     for key, v in pairs(currentlyCrafting) do
       if v.tracker.isCanceled() or v.tracker.isDone() then
-        bufferDirtyFlags.craftingStatus = true
+        event.push("craftingStatusUpdated") -- Signal the main thread
         currentlyCrafting[key] = nil
         -- Invalidate stock cache for this item
         local craftable = craftableLookup[key]
@@ -583,6 +583,13 @@ local function main()
     if not startIdx or not endIdx or startIdx > endIdx then startIdx, endIdx = 1, 0 end
 
     renderUI(search, page, results, startIdx, endIdx, termHeight, input, debugLogs)
+
+    -- Listen for crafting status updates
+    local eventName = event.pull(0.1, "craftingStatusUpdated")
+    if eventName == "craftingStatusUpdated" then
+      bufferDirtyFlags.craftingStatus = true
+    end
+
     local input = getInputWithTimeout(termHeight, 1)
 
     if input == nil or input == "" then
@@ -601,47 +608,16 @@ local function main()
     elseif input == ":p" then
       page = page - 1
       bufferDirtyFlags.craftable = true
-    elseif input == ":d" then
-      debugEnabled = not debugEnabled
-      debugLogs = {}
-    elseif input == ":a" then
-      onlyTargets = not onlyTargets
-      search = ""
-      page = 1
-      bufferDirtyFlags.craftable = true
-    elseif input:match("^:t ") then
-      onlyTargets = true
-      search = input:sub(4)
-      page = 1
-      bufferDirtyFlags.craftable = true
-    elseif tonumber(input) and results[tonumber(input)] then
-      local c = results[tonumber(input)]
-      local key = c.label .. "|" .. tostring(c.damage)
-      renderUI(search, page, results, startIdx, endIdx, termHeight, debugLogs)
-      term.setCursor(1, termHeight)
-      term.clearLine()
-      io.write("Set target stock for " .. c.label .. " (current: " .. (stockingLevels[key] or 0) .. ") [amount [batch]]: ")
-      local entry = io.read()
-      local amount, batch = entry:match("^(%d+)%s*(%d*)$")
-      amount = tonumber(amount)
-      batch = tonumber(batch)
-      if amount then
-        stockingLevels[key] = amount
-        if batch and batch > 0 then
-          batchSizes[key] = batch
-        else
-          batchSizes[key] = nil
-        end
+    elseif input:sub(1, 1) == ":" then
+      local cmd = input:sub(2)
+      if cmd == "a" then
+        onlyTargets = not onlyTargets
+        bufferDirtyFlags.craftable = true
       end
-      bufferDirtyFlags.craftable = true -- Mark craftable buffer dirty when stock levels change
     else
-      onlyTargets = false
-      if search ~= input then
-        bufferDirtyFlags.craftable = true -- Mark craftable buffer dirty when search changes
-        search = input
-      end
-      search = input or ""
+      search = input
       page = 1
+      bufferDirtyFlags.craftable = true
     end
   end
 
