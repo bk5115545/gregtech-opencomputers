@@ -218,6 +218,7 @@ local function requestManagerThread()
         local craftable = craftableLookup[key]
         if not craftable then
           addDebugLog("No craftable found for key: " .. key)
+          bufferDirtyFlags.craftingStatus = true
         else
           local stock = getCraftableStock(craftable)
           local crafting = currentlyCrafting[key] and currentlyCrafting[key].amount or 0
@@ -228,8 +229,10 @@ local function requestManagerThread()
             local cooldown = craftCooldowns[key] or 0
             if now < cooldown then
               addDebugLog("Cooldown active for " .. key .. " until " .. cooldown)
+              bufferDirtyFlags.craftingStatus = true
             else
               addDebugLog("Dispatching craft for " .. key .. ", amount: " .. toRequest)
+              bufferDirtyFlags.craftingStatus = true
               -- Dispatch craft logic here
               local batch = batchSizes[key]
               local reqAmount = batch and batch > 0 and math.min(batch, toRequest) or toRequest
@@ -255,6 +258,7 @@ local function requestManagerThread()
                 local delay = math.min(10 * fails, 60)
                 craftCooldowns[key] = now + delay
                 addDebugLog("Request error for:", key, req, "Cooldown:", delay, "s")
+                bufferDirtyFlags.craftingStatus = true
               end
             end
           end
@@ -272,6 +276,7 @@ local function requestManagerThread()
           stockCache[cacheKey] = nil
         end
         addDebugLog("Craft finished/canceled for: " .. key)
+        bufferDirtyFlags.craftingStatus = true
       end
     end
     os.sleep(10) -- Slow down craft progress checks
