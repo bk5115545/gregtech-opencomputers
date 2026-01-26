@@ -645,7 +645,9 @@ local function runMainLoop()
     local input = getInputWithTimeout(termHeight, 10)
 
     if input == nil or input == "" then
-      -- No input; refresh UI and continue
+      for k in pairs(bufferDirtyFlags) do
+        bufferDirtyFlags[k] = true
+      end
     elseif tonumber(input) and results[tonumber(input)] then
       local c = results[tonumber(input)]
       local key = c.label .. "|" .. tostring(c.damage)
