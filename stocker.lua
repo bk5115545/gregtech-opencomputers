@@ -125,13 +125,22 @@ end
 
 local debugLogs = {}
 
-local function addDebugLog(message)
+local function addDebugLog(message, logType)
   if not debugEnabled then 
     debugLogs = {}
     return
   end
 
-  table.insert(debugLogs, message)
+  local color = colors.white -- Default color
+  if logType == "success" or logType == nil then
+    color = colors.green
+  elseif logType == "failure" then
+    color = colors.red
+  elseif logType == "cooldown" then
+    color = colors.yellow
+  end
+
+  table.insert(debugLogs, {message = message, color = color})
   if #debugLogs > 100 then -- Limit the log size to the last 100 entries
     table.remove(debugLogs, 1)
   end
@@ -237,12 +246,12 @@ local function requestManagerThread()
             if now < cooldown then
               addDebugLog("Cooldown active for " .. key .. " until " .. cooldown)
             else
-              addDebugLog("Dispatching craft for " .. key .. ", amount: " .. toRequest)
+              addDebugLog("Dispatching craft for " .. key .. ", amount: " .. toRequest, "success")
               -- Dispatch craft logic here
               local batch = batchSizes[key]
               local reqAmount = batch and batch > 0 and math.min(batch, toRequest) or toRequest
               local ok, req = pcall(craftable.request, reqAmount)
-              addDebugLog("Request result: " .. tostring(ok) .. ", ".. tostring(amount) .. ", " .. tostring(key))
+              addDebugLog("Request result: " .. tostring(ok) .. ", " .. tostring(req), ok and "success" or "failure")
               if ok and req then
                 currentlyCrafting[key] = {tracker = req, amount = reqAmount, startTime = os.clock()}
                 craftFailures[key] = 0
@@ -255,20 +264,20 @@ local function requestManagerThread()
                     craftCooldowns[key] = nil
                   end
                 end
-                bufferDirtyFlags.craftingStatus = true
-                addDebugLog("Craft started for: " .. tostring(key))
+                addDebugLog("Craft started for: " .. tostring(key), "success")
               elseif not ok then
                 -- Failure: set cooldown
                 local fails = (craftFailures[key] or 0) + 1
                 craftFailures[key] = fails
                 local delay = math.min(10 * fails, 60)
                 craftCooldowns[key] = now + delay
-                addDebugLog("Request error for:", key, req, "Cooldown:", delay, "s")
+                addDebugLog("Request error for: " .. tostring(key) .. ", " .. tostring(req) .. ", Cooldown: " .. delay .. "s", "failure")
+                bufferDirtyFlags.craftingStatus = true
               end
             end
           end
         end
-        os.sleep(0.25) -- Sleep for 250ms between processing each craftable
+        os.sleep(0.025) -- Sleep for 25ms between processing each craftable
       end
     end
     for key, v in pairs(currentlyCrafting) do
@@ -280,7 +289,7 @@ local function requestManagerThread()
           local cacheKey = craftable.name .. "|" .. tostring(craftable.damage)
           stockCache[cacheKey] = nil
         end
-        addDebugLog("Craft finished/canceled for: " .. key)
+        addDebugLog("Craft finished/canceled for: " .. key, "success")
         bufferDirtyFlags.craftingStatus = true
       end
     end
@@ -353,8 +362,32 @@ local function renderCraftableData(results, startIdx, endIdx, page)
       local stock = getCraftableStock(c)
       local target = stockingLevels[key] or 0
       local crafting = currentlyCrafting[key] and currentlyCrafting[key].amount or 0
-      local line = string.format("%2d. %-20s [Stock: %d | Target: %d | Crafting: %d]", i, c.label, stock, target, crafting)
-      gpu.set(1, y, line)
+
+      -- Set color for stock
+      if target == 0 then
+        gpu.setForeground(colors.white) -- No target, set text to white
+      elseif stock >= target then
+        gpu.setForeground(colors.red)
+      else
+        gpu.setForeground(colors.green)
+      end
+      local stockText = string.format("Stock: %d", stock)
+      gpu.set(1, y, stockText)
+
+      -- Set color for target
+      gpu.setForeground(target == 0 and colors.white or colors.yellow) -- White if no target, otherwise yellow
+      local targetText = string.format(" | Target: %d", target)
+      gpu.set(1 + #stockText, y, targetText)
+
+      -- Set color for crafting
+      gpu.setForeground(colors.cyan)
+      local craftingText = string.format(" | Crafting: %d", crafting)
+      gpu.set(1 + #stockText + #targetText, y, craftingText)
+
+      -- Reset color and print label
+      gpu.setForeground(colors.white)
+      gpu.set(1, y, string.format("%2d. %-20s", i, c.label))
+
       y = y + 1
     end
   end
@@ -391,7 +424,14 @@ local function renderDebugInfo(debugLogs)
   gpu.set(1, y, "----------------------------------------------")
   y = y + 1
   for i = math.max(1, #debugLogs - debugHeight + 2), #debugLogs do
-    gpu.set(1, y, debugLogs[i])
+    local log = debugLogs[i]
+    if type(log) == "table" then
+      gpu.setForeground(log.color or colors.white)
+      gpu.set(1, y, log.message)
+    else
+      gpu.setForeground(colors.white)
+      gpu.set(1, y, log)
+    end
     y = y + 1
   end
 end
