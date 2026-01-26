@@ -580,8 +580,9 @@ local function main()
       bufferDirtyFlags.craftable = true -- Mark craftable buffer dirty when stock levels change
     else
       onlyTargets = false
-      if search != input then
+      if search ~= input then
         bufferDirtyFlags.craftable = true -- Mark craftable buffer dirty when search changes
+        search = input
       end
       search = input or ""
       page = 1
