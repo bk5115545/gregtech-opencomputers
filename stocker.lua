@@ -262,7 +262,7 @@ local function requestManagerThread()
               local ok, req = pcall(craftable.request, reqAmount)
               addDebugLog("Request result: " .. tostring(ok) .. ", " .. tostring(req), ok and "success" or "failure")
               if ok and req then
-                event.push("craftingStatusUpdated") -- Signal the main thread
+                bufferDirtyFlags.craftingStatus = true
                 currentlyCrafting[key] = {tracker = req, amount = reqAmount, startTime = os.clock()}
                 craftFailures[key] = 0
                 -- Gradually reduce cooldown
@@ -291,7 +291,7 @@ local function requestManagerThread()
     end
     for key, v in pairs(currentlyCrafting) do
       if v.tracker.isCanceled() or v.tracker.isDone() then
-        event.push("craftingStatusUpdated") -- Signal the main thread
+        bufferDirtyFlags.craftingStatus = true
         currentlyCrafting[key] = nil
         -- Invalidate stock cache for this item
         local craftable = craftableLookup[key]
@@ -615,12 +615,6 @@ local function main()
     if not startIdx or not endIdx or startIdx > endIdx then startIdx, endIdx = 1, 0 end
 
     renderUI(search, page, results, startIdx, endIdx, termHeight, input, debugLogs)
-
-    -- Listen for crafting status updates
-    local eventName = event.pull(0.1, "craftingStatusUpdated")
-    if eventName == "craftingStatusUpdated" then
-      bufferDirtyFlags.craftingStatus = true
-    end
 
     local input = getInputWithTimeout(termHeight, 1)
 
