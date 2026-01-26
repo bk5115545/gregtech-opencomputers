@@ -252,6 +252,7 @@ local function requestManagerThread()
               local ok, req = pcall(craftable.request, reqAmount)
               addDebugLog("Request result: " .. tostring(ok) .. ", " .. tostring(req), ok and "success" or "failure")
               if ok and req then
+                bufferDirtyFlags.craftingStatus = true
                 currentlyCrafting[key] = {tracker = req, amount = reqAmount, startTime = os.clock()}
                 craftFailures[key] = 0
                 -- Gradually reduce cooldown
