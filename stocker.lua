@@ -639,6 +639,10 @@ local function runMainLoop()
     elseif input == ":p" then
       page = page - 1
       bufferDirtyFlags.craftable = true
+    elseif input == ":d" then
+      debugEnabled = not debugEnabled
+      debugLogs = {}
+      bufferDirtyFlags.debug = true
     elseif input:sub(1, 1) == ":" then
       local cmd = input:sub(2)
       if cmd == "a" then
