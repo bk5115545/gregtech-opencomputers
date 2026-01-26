@@ -177,7 +177,7 @@ local function getStockCached(unlocalizedName, damage)
   local cacheKey = unlocalizedName .. "|" .. tostring(damage)
   local now = os.clock()
   local entry = stockCache[cacheKey]
-  if entry and (now - entry.time < STOCK_CACHE_TTL + math.random(-5, 5)) then -- Add jitter to cache expiration
+  if entry and (now - entry.time < STOCK_CACHE_TTL + math.random(0, STOCK_CACHE_TTL)) then -- Add jitter to cache expiration
     return entry.value
   else
     local value = getStock(unlocalizedName, damage)
