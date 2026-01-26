@@ -14,7 +14,7 @@ local stockingLevels = {}
 local currentlyCrafting = {}
 local craftableLookup = {}
 
-local PAGE_SIZE = 20
+local PAGE_SIZE = 25
 local CRAFTABLE_LIMIT = 400 -- Set higher for real use, lower for debug
 
 local STATUS_LIMIT = 10
@@ -188,12 +188,6 @@ local function getCraftableStock(c)
   return 0
 end
 
-local function debugPrint(...)
-  if debugEnabled then
-    print("[DEBUG]", ...)
-  end
-end
-
 local function printCraftingTracker()
   local trackerList = {}
   for key, v in pairs(currentlyCrafting) do
@@ -250,7 +244,7 @@ local function requestManagerThread()
               local batch = batchSizes[key]
               local reqAmount = batch and batch > 0 and math.min(batch, toRequest) or toRequest
               local ok, req = pcall(craftable.request, reqAmount)
-              debugPrint("Request result:", ok, req)
+              addDebugLog("Request result: " .. tostring(ok) .. ", " .. tostring(req))
               if ok and req then
                 currentlyCrafting[key] = {tracker = req, amount = reqAmount, startTime = os.clock()}
                 craftFailures[key] = 0
@@ -307,11 +301,11 @@ local function initializeBuffers()
   headerBuffer = gpu.allocateBuffer(headerWidth, headerHeight)
 
   -- Craftables Buffer (Left Half)
-  craftableWidth, craftableHeight = math.floor(w / 2), h - 9
+  craftableWidth, craftableHeight = math.floor(w / 2), h - 8
   craftableBuffer = gpu.allocateBuffer(craftableWidth, craftableHeight)
 
   -- Crafting Status Buffer (Right Half)
-  craftingStatusWidth, craftingStatusHeight = math.ceil(w / 2), h - 9
+  craftingStatusWidth, craftingStatusHeight = math.ceil(w / 2), h - 8
   craftingStatusBuffer = gpu.allocateBuffer(craftingStatusWidth, craftingStatusHeight)
 
   -- Debug Info Buffer
@@ -377,6 +371,8 @@ local function renderCraftingStatus()
   local y = 1
   gpu.set(1, y, "Crafting Status:")
   y = y + 1
+  gpu.set(1, y, "----------------------------------------------")
+  y = y + 1
   for key, v in pairs(currentlyCrafting) do
     local label, damage = key:match("^(.-)|(.+)$")
     local elapsed = os.clock() - (v.startTime or 0)
@@ -393,7 +389,9 @@ local function renderDebugInfo(debugLogs)
   local y = 1
   gpu.set(1, y, "[DEBUG LOGGING]")
   y = y + 1
-  for i = math.max(1, #debugLogs - debugHeight + 1), #debugLogs do
+  gpu.set(1, y, "----------------------------------------------")
+  y = y + 1
+  for i = math.max(1, #debugLogs - debugHeight + 2), #debugLogs do
     gpu.set(1, y, debugLogs[i])
     y = y + 1
   end
