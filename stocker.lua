@@ -621,7 +621,7 @@ local function runMainLoop()
 
     renderUI(search, page, results, startIdx, endIdx, termHeight, input, debugLogs)
 
-    local input = getInputWithTimeout(termHeight, 1)
+    local input = getInputWithTimeout(termHeight, 10)
 
     if input == nil or input == "" then
       -- No input; refresh UI and continue
@@ -650,9 +650,11 @@ local function runMainLoop()
         bufferDirtyFlags.craftable = true
       end
     else
-      search = input
-      page = 1
-      bufferDirtyFlags.craftable = true
+      if search ~= input then
+        search = input
+        page = 1
+        bufferDirtyFlags.craftable = true
+      end
     end
   end
 end
