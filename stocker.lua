@@ -21,10 +21,10 @@ local STATUS_LIMIT = 10
 local lastInputTime = os.clock()
 
 local stockCache = {}
-local STOCK_CACHE_TTL = 15 -- seconds
+local STOCK_CACHE_TTL = 60
 
 local fluidsCache = {data = nil, time = 0}
-local FLUIDS_CACHE_TTL = 3 -- seconds
+local FLUIDS_CACHE_TTL = 60
 
 local debugEnabled = false
 
@@ -71,26 +71,33 @@ end
 
 local function getAllCraftables()
   craftablesList = {}
+  craftableLookup = {}
   local all = me.getCraftables()
   print("Loading craftables (max "..CRAFTABLE_LIMIT.." of "..#all..")...")
   for i, c in ipairs(all) do
     if i > CRAFTABLE_LIMIT then break end
     local stack = c.getItemStack()
-    local fluidName = nil
-    if stack and stack.fluidDrop and stack.fluidDrop.name then
-      fluidName = stack.fluidDrop.name
+    if stack then
+      local fluidName = nil
+      if stack.fluidDrop and stack.fluidDrop.name then
+        fluidName = stack.fluidDrop.name
+      end
+      local key = stack.label .. "|" .. tostring(stack.damage)
+      local craftable = {
+        label = stack.label,
+        name = stack.name or stack.unlocalizedName,
+        damage = stack.damage,
+        fluidName = fluidName,
+        request = c.request
+      }
+      craftablesList[#craftablesList+1] = craftable
+      craftableLookup[key] = craftable
     end
-    craftablesList[#craftablesList+1] = {
-      label = stack.label,
-      name = stack.name or stack.unlocalizedName,
-      damage = stack.damage,
-      request = c.request,
-      fluidName = fluidName
-    }
     if i % 50 == 0 then print("  Loaded "..i.."/") end
   end
+  -- Sort craftablesList by label for efficient search
+  table.sort(craftablesList, function(a, b) return a.label < b.label end)
   print("Done loading craftables.")
-  buildCraftableLookup()
 end
 
 local function searchCraftables(query, onlyTargets)
@@ -132,7 +139,7 @@ local function getStockCached(unlocalizedName, damage)
   local cacheKey = unlocalizedName .. "|" .. tostring(damage)
   local now = os.clock()
   local entry = stockCache[cacheKey]
-  if entry and (now - entry.time < STOCK_CACHE_TTL) then
+  if entry and (now - entry.time < STOCK_CACHE_TTL + math.random(-5, 5)) then -- Add jitter to cache expiration
     return entry.value
   else
     local value = getStock(unlocalizedName, damage)
@@ -234,6 +241,7 @@ local function requestManagerThread()
             end
           end
         end
+        os.sleep(0.025) -- Sleep for 25ms between processing each craftable
       end
     end
     for key, v in pairs(currentlyCrafting) do
@@ -263,21 +271,29 @@ local function renderUI(search, page, results, startIdx, endIdx, termHeight, deb
     uiBuffer = gpu.allocateBuffer(w, h)
     bufferWidth, bufferHeight = w, h
   end
-  gpu.setActiveBuffer(uiBuffer)
-  gpu.fill(1, 1, w, h, " ")
 
-  local y = 1
-  gpu.setForeground(colors.cyan)
-  gpu.set(1, y, "AE2 Autostocker - Search: " .. search .. " | Page "..page)
-  y = y + 1
-  gpu.setForeground(colors.white)
-  gpu.set(1, y, "Type to search, :n/:p for next/prev page, :q to quit, :r to reload craftables, :s to save levels, :d to toggle debug, :a to show all targets.")
-  y = y + 1
-  gpu.set(1, y, "Select a craftable by number to set stock level.")
-  y = y + 1
-  gpu.set(1, y, "----------------------------------------------")
-  y = y + 1
+  -- Only update static parts of the UI if they have changed
+  if not uiStaticRendered or uiStaticRendered.search ~= search or uiStaticRendered.page ~= page then
+    gpu.setActiveBuffer(uiBuffer)
+    gpu.fill(1, 1, w, h, " ")
 
+    local y = 1
+    gpu.setForeground(colors.cyan)
+    gpu.set(1, y, "AE2 Autostocker - Search: " .. search .. " | Page "..page)
+    y = y + 1
+    gpu.setForeground(colors.white)
+    gpu.set(1, y, "Type to search, :n/:p for next/prev page, :q to quit, :r to reload craftables, :s to save levels, :d to toggle debug, :a to show all targets.")
+    y = y + 1
+    gpu.set(1, y, "Select a craftable by number to set stock level.")
+    y = y + 1
+    gpu.set(1, y, "----------------------------------------------")
+    y = y + 1
+
+    uiStaticRendered = {search = search, page = page}
+  end
+
+  -- Render dynamic parts of the UI
+  local y = 5 -- Start rendering below the static part
   if debugMode then
     gpu.set(1, y, "[DEBUG MODE ENABLED]")
     y = y + 1
@@ -295,38 +311,8 @@ local function renderUI(search, page, results, startIdx, endIdx, termHeight, deb
         local stock = getCraftableStock(c)
         local target = stockingLevels[key] or 0
         local crafting = currentlyCrafting[key] and currentlyCrafting[key].amount or 0
-        local line = string.format("%2d. %-32s ", i, c.label)
-        local x = 1
-        gpu.setForeground(colors.cyan)
-        gpu.set(x, y, string.format("%2d.", i))
-        x = x + 3
-        gpu.setForeground(colors.white)
-        gpu.set(x, y, string.format("%-32s ", c.label))
-        x = x + 33
-        -- Stock color
-        if stock >= target and target > 0 then
-          gpu.setForeground(colors.green)
-        elseif target > 0 then
-          gpu.setForeground(colors.red)
-        else
-          gpu.setForeground(colors.white)
-        end
-        gpu.set(x, y, string.format("[Stock: %d", stock))
-        x = x + #("[Stock: "..stock)
-        gpu.setForeground(colors.white)
-        gpu.set(x, y, " | Target: "..target)
-        x = x + #(" | Target: "..target)
-        if crafting > 0 then
-          gpu.setForeground(colors.yellow)
-          gpu.set(x, y, " | Crafting: "..crafting)
-          x = x + #(" | Crafting: "..crafting)
-          gpu.setForeground(colors.white)
-        else
-          gpu.set(x, y, " | Crafting: 0")
-          x = x + #(" | Crafting: 0")
-        end
-        gpu.set(x, y, "]")
-        gpu.setForeground(colors.white)
+        local line = string.format("%2d. %-32s [Stock: %d | Target: %d | Crafting: %d]", i, c.label, stock, target, crafting)
+        gpu.set(1, y, line)
         y = y + 1
       end
     end
