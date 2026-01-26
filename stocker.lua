@@ -651,10 +651,11 @@ local function main()
   local managerThread = thread.create(requestManagerThread)
   local success, err = pcall(runMainLoop, managerThread)
   if not success then
-    term.setCursor(1, gpu.getResolution())
-    term.clearLine()
-    io.write("An error occurred: " .. tostring(err))
-    io.read()
+    local errorFile = io.open("error", "w") -- Open the error file for writing
+    if errorFile then
+      errorFile:write("An error occurred: " .. tostring(err) .. "\n") -- Write the error to the file
+      errorFile:close()
+    end
   end
 
   -- Cleanup
