@@ -111,7 +111,7 @@ local function getAllCraftables()
       craftablesList[#craftablesList+1] = craftable
       craftableLookup[key] = craftable
     end
-    if i % 50 == 0 then print("  Loaded "..i) end
+    if i % 50 == 0 then print("  Loaded "..i.." / ".. #all) end
   end
   -- Sort craftablesList by label for efficient search
   table.sort(craftablesList, function(a, b) return a.label < b.label end)
