@@ -343,9 +343,14 @@ local bufferDirtyFlags = {
   input = true
 }
 
+local function clearBuffer(buffer, width, height)
+  gpu.setActiveBuffer(buffer)
+  gpu.fill(1, 1, width, height, " ")
+end
+
 local function renderHeader(search, page)
+  clearBuffer(headerBuffer, headerWidth, headerHeight)
   gpu.setActiveBuffer(headerBuffer)
-  gpu.fill(1, 1, headerWidth, headerHeight, " ")
 
   local y = 1
   gpu.setForeground(colors.cyan)
@@ -360,8 +365,8 @@ local function renderHeader(search, page)
 end
 
 local function renderCraftableData(results, startIdx, endIdx, page)
+  clearBuffer(craftableBuffer, craftableWidth, craftableHeight)
   gpu.setActiveBuffer(craftableBuffer)
-  gpu.fill(1, 1, craftableWidth, craftableHeight, " ")
 
   local y = 1
   for i = startIdx, endIdx do
@@ -411,8 +416,8 @@ local function renderCraftableData(results, startIdx, endIdx, page)
 end
 
 local function renderCraftingStatus()
+  clearBuffer(craftingStatusBuffer, craftingStatusWidth, craftingStatusHeight)
   gpu.setActiveBuffer(craftingStatusBuffer)
-  gpu.fill(1, 1, craftingStatusWidth, craftingStatusHeight, " ")
 
   local y = 1
   gpu.set(1, y, "Crafting Status:")
@@ -422,18 +427,47 @@ local function renderCraftingStatus()
 
   addDebugLog("Number of items in currentlyCrafting: " .. tostring(#currentlyCrafting))
 
+  -- Collect keys and sort by elapsed time
+  local keys = {}
   for key, v in pairs(currentlyCrafting) do
-    local label, damage = key:match("^(.-)|(.+)$")
+    table.insert(keys, key)
+  end
+  table.sort(keys, function(a, b)
+    return (os.clock() - (currentlyCrafting[a].startTime or 0)) > (os.clock() - (currentlyCrafting[b].startTime or 0))
+  end)
+
+  -- Header for columns
+  gpu.setForeground(colors.cyan)
+  gpu.set(1, y, string.format("%-30s %-10s %-10s", "Item", "Amount", "Elapsed"))
+  y = y + 1
+  gpu.set(1, y, "----------------------------------------------")
+  y = y + 1
+
+  for _, key in ipairs(keys) do
+    local v = currentlyCrafting[key]
+    local label = key:match("^(.-)|")
     local elapsed = os.clock() - (v.startTime or 0)
-    gpu.set(1, y, string.format("%s [%s] x%d | %.1fs", label, damage, v.amount, elapsed))
+
+    -- Set color based on crafting status
+    if v.amount > 0 then
+      gpu.setForeground(colors.green)
+    else
+      gpu.setForeground(colors.white)
+    end
+
+    -- Print aligned columns
+    gpu.set(1, y, string.format("%-30s %-10d %-10.1fs", v.label, v.amount, v.elapsed))
     y = y + 1
+
     if y > craftingStatusHeight then break end -- Prevent overflow
   end
+
+  gpu.setForeground(colors.white) -- Reset color to default
 end
 
 local function renderDebugInfo(debugLogs)
+  clearBuffer(debugBuffer, debugWidth, debugHeight)
   gpu.setActiveBuffer(debugBuffer)
-  gpu.fill(1, 1, debugWidth, debugHeight, " ")
 
   local y = 1
   gpu.set(1, y, "[DEBUG LOGGING]")
@@ -454,8 +488,8 @@ local function renderDebugInfo(debugLogs)
 end
 
 local function renderInputBar(input)
+  clearBuffer(inputBuffer, inputWidth, inputHeight)
   gpu.setActiveBuffer(inputBuffer)
-  gpu.fill(1, 1, inputWidth, inputHeight, " ")
   gpu.set(1, 1, "> " .. input)
 end
 
