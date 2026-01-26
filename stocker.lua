@@ -68,6 +68,16 @@ local function load()
   end
 end
 
+local function formatNumberWithSuffix(number)
+  if number >= 1000000 then
+    return string.format("%.1fm", number / 1000000)
+  elseif number >= 1000 then
+    return string.format("%.1fk", number / 1000)
+  else
+    return tostring(number)
+  end
+end
+
 
 local function buildCraftableLookup()
   craftableLookup = {}
