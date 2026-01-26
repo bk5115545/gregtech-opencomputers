@@ -454,7 +454,7 @@ local function renderCraftingStatus()
     end
 
     -- Print aligned columns
-    gpu.set(1, y, string.format("%-30s %-10d %-10.1fs", v.label, v.amount, v.elapsed))
+    gpu.set(1, y, string.format("%-30s %-10d %-10.1fs", v.label, v.amount, elapsed))
     y = y + 1
 
     if y > craftingStatusHeight then break end -- Prevent overflow
