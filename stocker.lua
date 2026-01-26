@@ -93,7 +93,7 @@ local function getAllCraftables()
       local key = stack.label .. "|" .. tostring(stack.damage)
       local craftable = {
         label = stack.label,
-        name = stack.name or stack.unlocalizedName,
+        name = stack.name,
         damage = stack.damage,
         fluidName = fluidName,
         request = c.request
@@ -467,6 +467,7 @@ local function getInputWithTimeout(termHeight, timeout)
     if #ev == 0 then
       return nil
     end
+    started = os.clock()
 
     local _, _, char, code = table.unpack(ev)
     if code == keyboard.keys.enter then
