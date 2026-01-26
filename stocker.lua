@@ -364,12 +364,12 @@ local function renderCraftableData(results, startIdx, endIdx, page)
 
       -- Print label with increased width
       gpu.setForeground(colors.white)
-      local labelText = string.format("%2d. %-30s", i, c.label) -- Increased width to 30 characters
-      labelText = labelText .. string.rep(" ", 32 - #labelText) -- Pad with spaces to clear leftover characters
+      local labelText = string.format("%2d. %-43s", i, c.label) -- Increased width to 43 characters
+      labelText = labelText .. string.rep(" ", 45 - #labelText) -- Pad with spaces to clear leftover characters
       gpu.set(1, y, labelText)
 
-      -- Print stock with short name (S)
-      local stockText = string.format("[S: %d", stock)
+      -- Print stock with suffix and short name (S)
+      local stockText = string.format("[S: %s", formatNumberWithSuffix(stock))
       stockText = stockText .. string.rep(" ", 10 - #stockText) -- Pad with spaces
       if target == 0 then
         gpu.setForeground(colors.white)
@@ -378,19 +378,19 @@ local function renderCraftableData(results, startIdx, endIdx, page)
       else
         gpu.setForeground(colors.red)
       end
-      gpu.set(34, y, stockText) -- Adjusted position for increased label width
+      gpu.set(34, y, stockText)
 
-      -- Print target with short name (T)
+      -- Print target with suffix and short name (T)
       gpu.setForeground(target == 0 and colors.white or colors.yellow)
-      local targetText = string.format(" | T: %d", target)
+      local targetText = string.format(" | T: %s", formatNumberWithSuffix(target))
       targetText = targetText .. string.rep(" ", 12 - #targetText) -- Pad with spaces
-      gpu.set(46, y, targetText) -- Adjusted position for increased label width
+      gpu.set(46, y, targetText)
 
-      -- Print crafting with short name (C)
+      -- Print crafting with suffix and short name (C)
       gpu.setForeground(colors.cyan)
-      local craftingText = string.format(" | C: %d]", crafting)
-      craftingText = craftingText .. string.rep(" ", 14 - #craftingText) -- Pad with spaces
-      gpu.set(58, y, craftingText) -- Adjusted position for increased label width
+      local craftingText = string.format(" | C: %s]", formatNumberWithSuffix(crafting))
+      craftingText = craftingText .. string.rep(" ", 20 - #craftingText) -- Pad with spaces
+      gpu.set(58, y, craftingText)
 
       y = y + 1
     end
