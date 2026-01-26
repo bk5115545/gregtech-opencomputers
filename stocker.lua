@@ -15,7 +15,7 @@ local currentlyCrafting = {}
 local craftableLookup = {}
 
 local PAGE_SIZE = 20
-local CRAFTABLE_LIMIT = 9999 -- Set higher for real use, lower for debug
+local CRAFTABLE_LIMIT = 400 -- Set higher for real use, lower for debug
 
 local STATUS_LIMIT = 10
 local lastInputTime = os.clock()
@@ -405,7 +405,7 @@ local function renderInputBar(input)
   gpu.set(1, 1, "> " .. input)
 end
 
-local function renderUI(search, page, results, startIdx, endIdx, termHeight, debugEnabled, input, debugLogs)
+local function renderUI(search, page, results, startIdx, endIdx, termHeight, input, debugLogs)
   -- Initialize buffers if not already done
   if not headerBuffer or not craftableBuffer or not debugBuffer or not craftingStatusBuffer or not inputBuffer then
     initializeBuffers()
@@ -529,7 +529,7 @@ local function main()
     local endIdx = math.min(page * PAGE_SIZE, #results)
     if not startIdx or not endIdx or startIdx > endIdx then startIdx, endIdx = 1, 0 end
 
-    renderUI(search, page, results, startIdx, endIdx, termHeight, debugEnabled, input, debugLogs)
+    renderUI(search, page, results, startIdx, endIdx, termHeight, input, debugLogs)
     local input = getInputWithTimeout(termHeight, 1)
 
     if input == nil or input == "" then
@@ -548,18 +548,21 @@ local function main()
       page = page - 1
     elseif input == ":d" then
       debugEnabled = not debugEnabled
+      debugLogs = {}
     elseif input == ":a" then
       onlyTargets = not onlyTargets
       search = ""
       page = 1
+      bufferDirtyFlags.craftable = true -- Mark craftable buffer dirty when toggling target view
     elseif input:match("^:t ") then
       onlyTargets = true
       search = input:sub(4)
       page = 1
+      bufferDirtyFlags.craftable = true -- Mark craftable buffer dirty when searching targets
     elseif tonumber(input) and results[tonumber(input)] then
       local c = results[tonumber(input)]
       local key = c.label .. "|" .. tostring(c.damage)
-      renderUI(search, page, results, startIdx, endIdx, termHeight, debugEnabled)
+      renderUI(search, page, results, startIdx, endIdx, termHeight, debugLogs)
       term.setCursor(1, termHeight)
       term.clearLine()
       io.write("Set target stock for " .. c.label .. " (current: " .. (stockingLevels[key] or 0) .. ") [amount [batch]]: ")
@@ -575,8 +578,12 @@ local function main()
           batchSizes[key] = nil
         end
       end
+      bufferDirtyFlags.craftable = true -- Mark craftable buffer dirty when stock levels change
     else
       onlyTargets = false
+      if search != input then
+        bufferDirtyFlags.craftable = true -- Mark craftable buffer dirty when search changes
+      end
       search = input or ""
       page = 1
     end
