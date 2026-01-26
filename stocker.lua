@@ -446,21 +446,26 @@ local function renderCraftingStatus()
     local label = key:match("^(.-)|")
     local elapsed = os.clock() - (v.startTime or 0)
 
-    -- Set color based on crafting status
-    if v.amount > 0 then
-      gpu.setForeground(colors.green)
-    else
-      gpu.setForeground(colors.white)
-    end
+    -- Render item name in white
+    gpu.setForeground(colors.white)
+    gpu.set(1, y, string.format("%-36s", label))
 
-    -- Print aligned columns
-    gpu.set(1, y, string.format("%-36s %-10d %-10.1fs", label, v.amount, elapsed))
+    -- Render amount in green
+    gpu.setForeground(colors.green)
+    gpu.set(38, y, string.format("%-10d", v.amount))
+
+    -- Render elapsed time in red if > 60s, otherwise yellow
+    if elapsed > 60 then
+      gpu.setForeground(colors.red)
+    else
+      gpu.setForeground(colors.yellow)
+    end
+    gpu.set(49, y, string.format("%-10.1fs", elapsed))
+
     y = y + 1
 
     if y > craftingStatusHeight then break end -- Prevent overflow
   end
-
-  gpu.setForeground(colors.white) -- Reset color to default
 end
 
 local function renderDebugInfo(debugLogs)
