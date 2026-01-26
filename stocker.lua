@@ -671,6 +671,11 @@ local function runMainLoop()
       debugEnabled = not debugEnabled
       debugLogs = {}
       bufferDirtyFlags.debug = true
+    elseif input == ":u" then
+      for k in pairs(bufferDirtyFlags) do
+        bufferDirtyFlags[k] = true
+        end
+      end
     elseif input:sub(1, 1) == ":" then
       local cmd = input:sub(2)
       if cmd == "a" then
