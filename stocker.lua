@@ -242,7 +242,7 @@ local function requestManagerThread()
               local batch = batchSizes[key]
               local reqAmount = batch and batch > 0 and math.min(batch, toRequest) or toRequest
               local ok, req = pcall(craftable.request, reqAmount)
-              addDebugLog("Request result: " .. tostring(ok) .. ", " .. tostring(req))
+              addDebugLog("Request result: " .. tostring(ok) .. ", ".. tostring(amount) .. ", " .. tostring(key))
               if ok and req then
                 currentlyCrafting[key] = {tracker = req, amount = reqAmount, startTime = os.clock()}
                 craftFailures[key] = 0
@@ -268,7 +268,7 @@ local function requestManagerThread()
             end
           end
         end
-        os.sleep(0.025) -- Sleep for 25ms between processing each craftable
+        os.sleep(0.25) -- Sleep for 250ms between processing each craftable
       end
     end
     for key, v in pairs(currentlyCrafting) do
@@ -284,6 +284,7 @@ local function requestManagerThread()
         bufferDirtyFlags.craftingStatus = true
       end
     end
+    addDebugLog("Sleeping...")
     os.sleep(10) -- Slow down craft progress checks
   end
 end
@@ -299,15 +300,15 @@ local function initializeBuffers()
   headerBuffer = gpu.allocateBuffer(headerWidth, headerHeight)
 
   -- Craftables Buffer (Left Half)
-  craftableWidth, craftableHeight = math.floor(w / 2), h - 12
+  craftableWidth, craftableHeight = math.floor(w / 2), 27
   craftableBuffer = gpu.allocateBuffer(craftableWidth, craftableHeight)
 
   -- Crafting Status Buffer (Right Half)
-  craftingStatusWidth, craftingStatusHeight = math.ceil(w / 2), h - 12
+  craftingStatusWidth, craftingStatusHeight = math.ceil(w / 2), 27
   craftingStatusBuffer = gpu.allocateBuffer(craftingStatusWidth, craftingStatusHeight)
 
   -- Debug Info Buffer
-  debugWidth, debugHeight = w, 10 -- Increased height for debug logs
+  debugWidth, debugHeight = w, h - headerHeight - craftableHeight - 1
   debugBuffer = gpu.allocateBuffer(debugWidth, debugHeight)
 
   -- Input Bar Buffer
