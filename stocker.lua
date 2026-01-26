@@ -294,7 +294,6 @@ local function requestManagerThread()
       end
     end
     
-    
     for key, v in pairs(currentlyCrafting) do
       os.sleep(0.060)
       if v.tracker.isCanceled() or v.tracker.isDone() then
@@ -636,7 +635,7 @@ local function runMainLoop()
     elseif tonumber(input) and results[tonumber(input)] then
       local c = results[tonumber(input)]
       local key = c.label .. "|" .. tostring(c.damage)
-      renderUI(search, page, results, startIdx, endIdx, termHeight, debugLogs)
+      renderUI(search, page, results, startIdx, endIdx, termHeight, input, debugLogs)
       term.setCursor(1, termHeight)
       term.clearLine()
       io.write("Set target stock for " .. c.label .. " (current: " .. (stockingLevels[key] or 0) .. ") [amount [batch]]: ")
@@ -652,7 +651,8 @@ local function runMainLoop()
           batchSizes[key] = nil
         end
       end
-      bufferDirtyFlags.craftable = true -- Mark craftable buffer dirty when stock levels change
+      bufferDirtyFlags.craftable = true
+      bufferDirtyFlags.input = true
     elseif input == ":q" then
       break
     elseif input == ":r" then
