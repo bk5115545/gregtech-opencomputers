@@ -267,20 +267,20 @@ local function initializeBuffers()
   local w, h = gpu.getResolution()
 
   -- Header/Instructions Buffer
-  headerWidth, headerHeight = w, 5
+  headerWidth, headerHeight = w, 3
   headerBuffer = gpu.allocateBuffer(headerWidth, headerHeight)
 
-  -- Craftable/Target Data Buffer
-  craftableWidth, craftableHeight = w, h - 15
+  -- Craftables Buffer (Left Half)
+  craftableWidth, craftableHeight = math.floor(w / 2), h - 9
   craftableBuffer = gpu.allocateBuffer(craftableWidth, craftableHeight)
+
+  -- Crafting Status Buffer (Right Half)
+  craftingStatusWidth, craftingStatusHeight = math.ceil(w / 2), h - 9
+  craftingStatusBuffer = gpu.allocateBuffer(craftingStatusWidth, craftingStatusHeight)
 
   -- Debug Info Buffer
   debugWidth, debugHeight = w, 5
   debugBuffer = gpu.allocateBuffer(debugWidth, debugHeight)
-
-  -- Crafting Status Buffer
-  craftingStatusWidth, craftingStatusHeight = w, 5
-  craftingStatusBuffer = gpu.allocateBuffer(craftingStatusWidth, craftingStatusHeight)
 
   -- Input Bar Buffer
   inputWidth, inputHeight = w, 1
@@ -298,8 +298,6 @@ local function renderHeader(search, page)
   gpu.setForeground(colors.white)
   gpu.set(1, y, "Type to search, :n/:p for next/prev page, :q to quit, :r to reload craftables, :s to save levels, :d to toggle debug, :a to show all targets.")
   y = y + 1
-  gpu.set(1, y, "Select a craftable by number to set stock level.")
-  y = y + 1
   gpu.set(1, y, "----------------------------------------------")
 end
 
@@ -315,7 +313,7 @@ local function renderCraftableData(results, startIdx, endIdx, page)
       local stock = getCraftableStock(c)
       local target = stockingLevels[key] or 0
       local crafting = currentlyCrafting[key] and currentlyCrafting[key].amount or 0
-      local line = string.format("%2d. %-32s [Stock: %d | Target: %d | Crafting: %d]", i, c.label, stock, target, crafting)
+      local line = string.format("%2d. %-20s [Stock: %d | Target: %d | Crafting: %d]", i, c.label, stock, target, crafting)
       gpu.set(1, y, line)
       y = y + 1
     end
@@ -346,7 +344,7 @@ local function renderDebugInfo(debugLogs)
   gpu.fill(1, 1, debugWidth, debugHeight, " ")
 
   local y = 1
-  gpu.set(1, y, "[DEBUG INFO]")
+  gpu.set(1, y, "[DEBUG LOGGING]")
   y = y + 1
   for i = math.max(1, #debugLogs - debugHeight + 1), #debugLogs do
     gpu.set(1, y, debugLogs[i])
@@ -366,23 +364,21 @@ local function renderUI(search, page, results, startIdx, endIdx, termHeight, deb
     initializeBuffers()
   end
 
-  -- Render static header
+  -- Render header
   renderHeader(search, page)
   gpu.bitblt(0, 1, 1, headerWidth, headerHeight, headerBuffer, 1, 1)
 
-  -- Render craftable/target data
+  -- Render craftables (left half)
   renderCraftableData(results, startIdx, endIdx, page)
-  gpu.bitblt(0, 6, 1, craftableWidth, craftableHeight, craftableBuffer, 1, 1)
+  gpu.bitblt(0, 4, 1, craftableWidth, craftableHeight, craftableBuffer, 1, 1)
 
-  -- Render crafting status
+  -- Render crafting status (right half)
   renderCraftingStatus()
-  gpu.bitblt(0, craftableHeight + 6, 1, craftingStatusWidth, craftingStatusHeight, craftingStatusBuffer, 1, 1)
+  gpu.bitblt(0, 4, craftableWidth + 1, craftingStatusWidth, craftingStatusHeight, craftingStatusBuffer, 1, 1)
 
-  -- Render debug info if enabled
-  if debugMode then
-    renderDebugInfo(debugLogs)
-    gpu.bitblt(0, craftableHeight + craftingStatusHeight + 6, 1, debugWidth, debugHeight, debugBuffer, 1, 1)
-  end
+  -- Render debug info
+  renderDebugInfo(debugLogs)
+  gpu.bitblt(0, craftableHeight + 4, 1, debugWidth, debugHeight, debugBuffer, 1, 1)
 
   -- Render input bar
   renderInputBar(input or "")
