@@ -425,8 +425,6 @@ local function renderCraftingStatus()
   gpu.set(1, y, "----------------------------------------------")
   y = y + 1
 
-  addDebugLog("Number of items in currentlyCrafting: " .. tostring(#currentlyCrafting))
-
   -- Collect keys and sort by elapsed time
   local keys = {}
   for key, v in pairs(currentlyCrafting) do
