@@ -688,7 +688,6 @@ local function runMainLoop()
     elseif input == ":u" then
       for k in pairs(bufferDirtyFlags) do
         bufferDirtyFlags[k] = true
-        end
       end
     elseif input:sub(1, 1) == ":" then
       local cmd = input:sub(2)
