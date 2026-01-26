@@ -119,6 +119,20 @@ local function getAllCraftables()
   bufferDirtyFlags.craftable = true
 end
 
+-- Support k (thousands) and m (millions) suffixes for amount and batch
+local function parseAmount(str)
+  if not str or str == "" then return nil end
+  local num, suffix = str:match("^(%d+)([kKmM]?)$")
+  num = tonumber(num)
+  if not num then return nil end
+  if suffix == "k" or suffix == "K" then
+    num = num * 1000
+  elseif suffix == "m" or suffix == "M" then
+    num = num * 1000000
+  end
+  return num
+end
+
 local function searchCraftables(query, onlyTargets)
   query = query:lower()
   local results = {}
@@ -640,9 +654,9 @@ local function runMainLoop()
       term.clearLine()
       io.write("Set target stock for " .. c.label .. " (current: " .. (stockingLevels[key] or 0) .. ") [amount [batch]]: ")
       local entry = io.read()
-      local amount, batch = entry:match("^(%d+)%s*(%d*)$")
-      amount = tonumber(amount)
-      batch = tonumber(batch)
+      local amountStr, batchStr = entry:match("^(%w+)%s*(%w*)$")
+      local amount = parseAmount(amountStr)
+      local batch = parseAmount(batchStr)
       if amount then
         stockingLevels[key] = amount
         if batch and batch > 0 then
