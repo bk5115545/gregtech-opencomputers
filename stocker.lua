@@ -260,73 +260,135 @@ local function requestManagerThread()
   end
 end
 
-local uiBuffer = nil
-local bufferWidth, bufferHeight = gpu.getResolution()
+local headerBuffer, craftableBuffer, debugBuffer, inputBuffer
+local headerWidth, headerHeight, craftableWidth, craftableHeight, debugWidth, debugHeight, inputWidth, inputHeight
 
-local function renderUI(search, page, results, startIdx, endIdx, termHeight, debugMode)
-  -- Allocate buffer if needed
+local function initializeBuffers()
   local w, h = gpu.getResolution()
-  if not uiBuffer or bufferWidth ~= w or bufferHeight ~= h then
-    if uiBuffer then pcall(gpu.freeBuffer, uiBuffer) end
-    uiBuffer = gpu.allocateBuffer(w, h)
-    bufferWidth, bufferHeight = w, h
-  end
 
-  -- Only update static parts of the UI if they have changed
-  if not uiStaticRendered or uiStaticRendered.search ~= search or uiStaticRendered.page ~= page then
-    gpu.setActiveBuffer(uiBuffer)
-    gpu.fill(1, 1, w, h, " ")
+  -- Header/Instructions Buffer
+  headerWidth, headerHeight = w, 5
+  headerBuffer = gpu.allocateBuffer(headerWidth, headerHeight)
 
-    local y = 1
-    gpu.setForeground(colors.cyan)
-    gpu.set(1, y, "AE2 Autostocker - Search: " .. search .. " | Page "..page)
-    y = y + 1
-    gpu.setForeground(colors.white)
-    gpu.set(1, y, "Type to search, :n/:p for next/prev page, :q to quit, :r to reload craftables, :s to save levels, :d to toggle debug, :a to show all targets.")
-    y = y + 1
-    gpu.set(1, y, "Select a craftable by number to set stock level.")
-    y = y + 1
-    gpu.set(1, y, "----------------------------------------------")
-    y = y + 1
+  -- Craftable/Target Data Buffer
+  craftableWidth, craftableHeight = w, h - 15
+  craftableBuffer = gpu.allocateBuffer(craftableWidth, craftableHeight)
 
-    uiStaticRendered = {search = search, page = page}
-  end
+  -- Debug Info Buffer
+  debugWidth, debugHeight = w, 5
+  debugBuffer = gpu.allocateBuffer(debugWidth, debugHeight)
 
-  -- Render dynamic parts of the UI
-  local y = 5 -- Start rendering below the static part
-  if debugMode then
-    gpu.set(1, y, "[DEBUG MODE ENABLED]")
-    y = y + 1
-    for key, v in pairs(currentlyCrafting) do
-      local label, damage = key:match("^(.-)|(.+)$")
-      local elapsed = os.clock() - (v.startTime or 0)
-      gpu.set(1, y, string.format("%s [%s] x%d | %.1fs", label, damage, v.amount, elapsed))
+  -- Crafting Status Buffer
+  craftingStatusWidth, craftingStatusHeight = w, 5
+  craftingStatusBuffer = gpu.allocateBuffer(craftingStatusWidth, craftingStatusHeight)
+
+  -- Input Bar Buffer
+  inputWidth, inputHeight = w, 1
+  inputBuffer = gpu.allocateBuffer(inputWidth, inputHeight)
+end
+
+local function renderHeader(search, page)
+  gpu.setActiveBuffer(headerBuffer)
+  gpu.fill(1, 1, headerWidth, headerHeight, " ")
+
+  local y = 1
+  gpu.setForeground(colors.cyan)
+  gpu.set(1, y, "AE2 Autostocker - Search: " .. search .. " | Page " .. page)
+  y = y + 1
+  gpu.setForeground(colors.white)
+  gpu.set(1, y, "Type to search, :n/:p for next/prev page, :q to quit, :r to reload craftables, :s to save levels, :d to toggle debug, :a to show all targets.")
+  y = y + 1
+  gpu.set(1, y, "Select a craftable by number to set stock level.")
+  y = y + 1
+  gpu.set(1, y, "----------------------------------------------")
+end
+
+local function renderCraftableData(results, startIdx, endIdx, page)
+  gpu.setActiveBuffer(craftableBuffer)
+  gpu.fill(1, 1, craftableWidth, craftableHeight, " ")
+
+  local y = 1
+  for i = startIdx, endIdx do
+    local c = results[i]
+    if c then
+      local key = c.label .. "|" .. tostring(c.damage)
+      local stock = getCraftableStock(c)
+      local target = stockingLevels[key] or 0
+      local crafting = currentlyCrafting[key] and currentlyCrafting[key].amount or 0
+      local line = string.format("%2d. %-32s [Stock: %d | Target: %d | Crafting: %d]", i, c.label, stock, target, crafting)
+      gpu.set(1, y, line)
       y = y + 1
     end
-  else
-    for i = startIdx, endIdx do
-      local c = results[i]
-      if c then
-        local key = c.label .. "|" .. tostring(c.damage)
-        local stock = getCraftableStock(c)
-        local target = stockingLevels[key] or 0
-        local crafting = currentlyCrafting[key] and currentlyCrafting[key].amount or 0
-        local line = string.format("%2d. %-32s [Stock: %d | Target: %d | Crafting: %d]", i, c.label, stock, target, crafting)
-        gpu.set(1, y, line)
-        y = y + 1
-      end
-    end
-    gpu.set(1, y, string.format("-- Page %d/%d --", page, math.max(1, math.ceil(#results / PAGE_SIZE))))
+  end
+  gpu.set(1, y, string.format("-- Page %d/%d --", page, math.max(1, math.ceil(#results / PAGE_SIZE))))
+  y = y + 1
+  gpu.set(1, y, "----------------------------------------------")
+end
+
+local function renderCraftingStatus()
+  gpu.setActiveBuffer(craftingStatusBuffer)
+  gpu.fill(1, 1, craftingStatusWidth, craftingStatusHeight, " ")
+
+  local y = 1
+  gpu.set(1, y, "Crafting Status:")
+  y = y + 1
+  for key, v in pairs(currentlyCrafting) do
+    local label, damage = key:match("^(.-)|(.+)$")
+    local elapsed = os.clock() - (v.startTime or 0)
+    gpu.set(1, y, string.format("%s [%s] x%d | %.1fs", label, damage, v.amount, elapsed))
     y = y + 1
-    gpu.set(1, y, "----------------------------------------------")
+    if y > craftingStatusHeight then break end -- Prevent overflow
+  end
+end
+
+local function renderDebugInfo(debugLogs)
+  gpu.setActiveBuffer(debugBuffer)
+  gpu.fill(1, 1, debugWidth, debugHeight, " ")
+
+  local y = 1
+  gpu.set(1, y, "[DEBUG INFO]")
+  y = y + 1
+  for i = math.max(1, #debugLogs - debugHeight + 1), #debugLogs do
+    gpu.set(1, y, debugLogs[i])
     y = y + 1
   end
+end
+
+local function renderInputBar(input)
+  gpu.setActiveBuffer(inputBuffer)
+  gpu.fill(1, 1, inputWidth, inputHeight, " ")
+  gpu.set(1, 1, "> " .. input)
+end
+
+local function renderUI(search, page, results, startIdx, endIdx, termHeight, debugMode, input, debugLogs)
+  -- Initialize buffers if not already done
+  if not headerBuffer or not craftableBuffer or not debugBuffer or not craftingStatusBuffer or not inputBuffer then
+    initializeBuffers()
+  end
+
+  -- Render static header
+  renderHeader(search, page)
+  gpu.bitblt(0, 1, 1, headerWidth, headerHeight, headerBuffer, 1, 1)
+
+  -- Render craftable/target data
+  renderCraftableData(results, startIdx, endIdx, page)
+  gpu.bitblt(0, 6, 1, craftableWidth, craftableHeight, craftableBuffer, 1, 1)
+
+  -- Render crafting status
+  renderCraftingStatus()
+  gpu.bitblt(0, craftableHeight + 6, 1, craftingStatusWidth, craftingStatusHeight, craftingStatusBuffer, 1, 1)
+
+  -- Render debug info if enabled
+  if debugMode then
+    renderDebugInfo(debugLogs)
+    gpu.bitblt(0, craftableHeight + craftingStatusHeight + 6, 1, debugWidth, debugHeight, debugBuffer, 1, 1)
+  end
+
+  -- Render input bar
+  renderInputBar(input or "")
+  gpu.bitblt(0, termHeight, 1, inputWidth, inputHeight, inputBuffer, 1, 1)
 
   gpu.setActiveBuffer(0)
-  gpu.bitblt(0, 1, 1, w, h, uiBuffer, 1, 1)
-  -- Move input line to bottom
-  term.setCursor(1, termHeight)
-  term.clearLine()
 end
 
 local function getInputWithTimeout(termHeight, timeout)
@@ -400,7 +462,7 @@ local function main()
     local endIdx = math.min(page * PAGE_SIZE, #results)
     if not startIdx or not endIdx or startIdx > endIdx then startIdx, endIdx = 1, 0 end
 
-    renderUI(search, page, results, startIdx, endIdx, termHeight, debugMode)
+    renderUI(search, page, results, startIdx, endIdx, termHeight, debugMode, input, debugLogs)
     local input = getInputWithTimeout(termHeight, 1)
 
     if input == nil or input == "" then
@@ -418,7 +480,7 @@ local function main()
     elseif input == ":d" then
       debugMode = not debugMode
     elseif input == ":a" then
-      onlyTargets = true
+      onlyTargets = not onlyTargets
       search = ""
       page = 1
     elseif input:match("^:t ") then
