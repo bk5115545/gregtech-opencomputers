@@ -98,6 +98,7 @@ local function getAllCraftables()
   -- Sort craftablesList by label for efficient search
   table.sort(craftablesList, function(a, b) return a.label < b.label end)
   print("Done loading craftables.")
+  bufferDirtyFlags.craftable = true
 end
 
 local function searchCraftables(query, onlyTargets)
@@ -110,6 +111,7 @@ local function searchCraftables(query, onlyTargets)
       results[#results+1] = c
     end
   end
+  bufferDirtyFlags.craftable = true
   return results
 end
 
@@ -120,6 +122,7 @@ local function addDebugLog(message)
   if #debugLogs > 100 then -- Limit the log size to the last 100 entries
     table.remove(debugLogs, 1)
   end
+  bufferDirtyFlags.debug = true
 end
 
 local function getStock(unlocalizedName, damage)
@@ -450,17 +453,20 @@ local function getInputWithTimeout(termHeight, timeout)
     local _, _, char, code = table.unpack(ev)
     if code == keyboard.keys.enter then
       term.clearLine()
+      bufferDirtyFlags.input = true
       return buffer
     elseif code == keyboard.keys.back then
       if #buffer > 0 then
         buffer = buffer:sub(1, -2)
         term.clearLine()
         io.write("> " .. buffer)
+        bufferDirtyFlags.input = true
       end
     elseif char and char >= 32 and char <= 126 then
       local ch = string.char(char)
       buffer = buffer .. ch
       io.write(ch)
+      bufferDirtyFlags.input = true
     end
   end
 end
