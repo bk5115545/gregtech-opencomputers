@@ -81,7 +81,7 @@ local function getAllCraftables()
   craftablesList = {}
   craftableLookup = {}
   local all = me.getCraftables()
-  print("Loading craftables (max "..CRAFTABLE_LIMIT.." of "..#all..")...")
+  print("Loading craftables (Found ".. #all .." of "..CRAFTABLE_LIMIT..")...")
   for i, c in ipairs(all) do
     if i > CRAFTABLE_LIMIT then break end
     local stack = c.getItemStack()
@@ -101,7 +101,7 @@ local function getAllCraftables()
       craftablesList[#craftablesList+1] = craftable
       craftableLookup[key] = craftable
     end
-    if i % 50 == 0 then print("  Loaded "..i.."/") end
+    if i % 50 == 0 then print("  Loaded "..i) end
   end
   -- Sort craftablesList by label for efficient search
   table.sort(craftablesList, function(a, b) return a.label < b.label end)
@@ -126,6 +126,11 @@ end
 local debugLogs = {}
 
 local function addDebugLog(message)
+  if not debugEnabled then 
+    debugLogs = {}
+    return
+  end
+
   table.insert(debugLogs, message)
   if #debugLogs > 100 then -- Limit the log size to the last 100 entries
     table.remove(debugLogs, 1)
@@ -173,12 +178,12 @@ local function getStockCached(unlocalizedName, damage)
 end
 
 local function getCraftableStock(c)
-  local stock = getStock(c.name, c.damage)
+  local stock = getStockCached(c.name, c.damage) -- Use cached stock lookup
   if stock > 0 then
     return stock
   end
   if c.fluidName then
-    return getStock(c.fluidName, 0)
+    return getStockCached(c.fluidName, 0) -- Use cached stock lookup for fluids
   end
   return 0
 end
