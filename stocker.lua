@@ -26,7 +26,7 @@ local STOCK_CACHE_TTL = 60
 local fluidsCache = {data = nil, time = 0}
 local FLUIDS_CACHE_TTL = 60
 
-local debugEnabled = false
+local debugEnabled = true
 
 local colors = {
   white = 0xFFFFFF,
@@ -405,7 +405,7 @@ local function renderInputBar(input)
   gpu.set(1, 1, "> " .. input)
 end
 
-local function renderUI(search, page, results, startIdx, endIdx, termHeight, debugMode, input, debugLogs)
+local function renderUI(search, page, results, startIdx, endIdx, termHeight, debugEnabled, input, debugLogs)
   -- Initialize buffers if not already done
   if not headerBuffer or not craftableBuffer or not debugBuffer or not craftingStatusBuffer or not inputBuffer then
     initializeBuffers()
@@ -499,10 +499,15 @@ local function main()
   local page = 1
   local _, termHeight = term.getViewport()
   local onlyTargets = false
-  local debugMode = false
 
   while true do
     local results
+
+    if debugEnabled then
+      -- if debug mode, always blit the debug buffer
+      bufferDirtyFlags.debug = true
+    end
+
     if onlyTargets then
       results = {}
       for key, target in pairs(stockingLevels) do
@@ -524,7 +529,7 @@ local function main()
     local endIdx = math.min(page * PAGE_SIZE, #results)
     if not startIdx or not endIdx or startIdx > endIdx then startIdx, endIdx = 1, 0 end
 
-    renderUI(search, page, results, startIdx, endIdx, termHeight, debugMode, input, debugLogs)
+    renderUI(search, page, results, startIdx, endIdx, termHeight, debugEnabled, input, debugLogs)
     local input = getInputWithTimeout(termHeight, 1)
 
     if input == nil or input == "" then
@@ -533,6 +538,8 @@ local function main()
       break
     elseif input == ":r" then
       getAllCraftables()
+      results = searchCraftables(search, onlyTargets) -- Update results after reloading craftables
+      bufferDirtyFlags.craftable = true
     elseif input == ":s" then
       save()
     elseif input == ":n" then
@@ -540,7 +547,7 @@ local function main()
     elseif input == ":p" then
       page = page - 1
     elseif input == ":d" then
-      debugMode = not debugMode
+      debugEnabled = not debugEnabled
     elseif input == ":a" then
       onlyTargets = not onlyTargets
       search = ""
@@ -552,7 +559,7 @@ local function main()
     elseif tonumber(input) and results[tonumber(input)] then
       local c = results[tonumber(input)]
       local key = c.label .. "|" .. tostring(c.damage)
-      renderUI(search, page, results, startIdx, endIdx, termHeight, debugMode)
+      renderUI(search, page, results, startIdx, endIdx, termHeight, debugEnabled)
       term.setCursor(1, termHeight)
       term.clearLine()
       io.write("Set target stock for " .. c.label .. " (current: " .. (stockingLevels[key] or 0) .. ") [amount [batch]]: ")
