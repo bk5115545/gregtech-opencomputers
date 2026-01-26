@@ -113,9 +113,19 @@ local function searchCraftables(query, onlyTargets)
   return results
 end
 
+local debugLogs = {}
+
+local function addDebugLog(message)
+  table.insert(debugLogs, message)
+  if #debugLogs > 100 then -- Limit the log size to the last 100 entries
+    table.remove(debugLogs, 1)
+  end
+end
+
 local function getStock(unlocalizedName, damage)
   local item = me.getItemInNetwork(unlocalizedName, damage)
   if item and item.size then
+    addDebugLog("Lookup stock for item: " .. unlocalizedName .. ", found: " .. item.size)
     return item.size
   end
   -- Try fluids with cache
@@ -123,15 +133,18 @@ local function getStock(unlocalizedName, damage)
   if not fluidsCache.data or (now - fluidsCache.time > FLUIDS_CACHE_TTL) then
     fluidsCache.data = me.getFluidsInNetwork()
     fluidsCache.time = now
+    addDebugLog("Updated fluids cache")
   end
   local fluids = fluidsCache.data
   if fluids then
     for _, f in ipairs(fluids) do
       if f.name == unlocalizedName then
+        addDebugLog("Lookup fluid stock for: " .. unlocalizedName .. ", found: " .. (f.amount or 0))
         return f.amount or 0
       end
     end
   end
+  addDebugLog("Lookup stock for item: " .. unlocalizedName .. " not found")
   return 0
 end
 
@@ -201,18 +214,20 @@ local function requestManagerThread()
       if target and target > 0 then
         local craftable = craftableLookup[key]
         if not craftable then
-          debugPrint("No craftable found for key:", key)
+          addDebugLog("No craftable found for key: " .. key)
         else
           local stock = getCraftableStock(craftable)
           local crafting = currentlyCrafting[key] and currentlyCrafting[key].amount or 0
-          debugPrint("Found craftable for key:", key, "Stock:", stock, "Target:", target)
+          addDebugLog("Found craftable for key: " .. key .. ", Stock: " .. stock .. ", Target: " .. target)
           local toRequest = target - (stock + crafting)
           if toRequest > 0 and not currentlyCrafting[key] then
             -- Check cooldown
             local cooldown = craftCooldowns[key] or 0
             if now < cooldown then
-              debugPrint("Cooldown active for", key, "until", cooldown)
+              addDebugLog("Cooldown active for " .. key .. " until " .. cooldown)
             else
+              addDebugLog("Dispatching craft for " .. key .. ", amount: " .. toRequest)
+              -- Dispatch craft logic here
               local batch = batchSizes[key]
               local reqAmount = batch and batch > 0 and math.min(batch, toRequest) or toRequest
               local ok, req = pcall(craftable.request, reqAmount)
@@ -229,14 +244,14 @@ local function requestManagerThread()
                     craftCooldowns[key] = nil
                   end
                 end
-                debugPrint("Craft started for:", key)
+                addDebugLog("Craft started for:", key)
               elseif not ok then
                 -- Failure: set cooldown
                 local fails = (craftFailures[key] or 0) + 1
                 craftFailures[key] = fails
                 local delay = math.min(10 * fails, 60)
                 craftCooldowns[key] = now + delay
-                debugPrint("Request error for:", key, req, "Cooldown:", delay, "s")
+                addDebugLog("Request error for:", key, req, "Cooldown:", delay, "s")
               end
             end
           end
@@ -253,7 +268,7 @@ local function requestManagerThread()
           local cacheKey = craftable.name .. "|" .. tostring(craftable.damage)
           stockCache[cacheKey] = nil
         end
-        debugPrint("Craft finished/canceled for:", key)
+        addDebugLog("Craft finished/canceled for: " .. key)
       end
     end
     os.sleep(10) -- Slow down craft progress checks
