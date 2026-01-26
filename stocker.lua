@@ -378,7 +378,7 @@ local function renderHeader(search, page)
   gpu.set(1, y, "AE2 Autostocker - Search: " .. search .. " | Page " .. page)
   y = y + 1
   gpu.setForeground(colors.white)
-  gpu.set(1, y, "Type to search, :n/:p for next/prev page, :q to quit, :r to reload craftables, :s to save levels, :d to toggle debug, :a to show all targets.")
+  gpu.set(1, y, "Type to search, :n/:p for next/prev page, :q to quit, :r to reload craftables, :s to save levels, :d to toggle debug, :a to show all targets, :u to force render")
   y = y + 1
   gpu.set(1, y, string.format("%-43s %-10s %-10s %-10s", "Item", "Stock", "Target", "Crafting"))
   y = y + 1
