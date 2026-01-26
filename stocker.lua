@@ -287,6 +287,15 @@ local function initializeBuffers()
   inputBuffer = gpu.allocateBuffer(inputWidth, inputHeight)
 end
 
+-- Table to track dirty flags for buffers
+local bufferDirtyFlags = {
+  header = true,
+  craftable = true,
+  craftingStatus = true,
+  debug = true,
+  input = true
+}
+
 local function renderHeader(search, page)
   gpu.setActiveBuffer(headerBuffer)
   gpu.fill(1, 1, headerWidth, headerHeight, " ")
@@ -297,6 +306,8 @@ local function renderHeader(search, page)
   y = y + 1
   gpu.setForeground(colors.white)
   gpu.set(1, y, "Type to search, :n/:p for next/prev page, :q to quit, :r to reload craftables, :s to save levels, :d to toggle debug, :a to show all targets.")
+  y = y + 1
+  gpu.set(1, y, "Select a craftable by number to set stock level.")
   y = y + 1
   gpu.set(1, y, "----------------------------------------------")
 end
@@ -365,24 +376,39 @@ local function renderUI(search, page, results, startIdx, endIdx, termHeight, deb
   end
 
   -- Render header
-  renderHeader(search, page)
-  gpu.bitblt(0, 1, 1, headerWidth, headerHeight, headerBuffer, 1, 1)
+  if bufferDirtyFlags.header then
+    renderHeader(search, page)
+    gpu.bitblt(0, 1, 1, headerWidth, headerHeight, headerBuffer, 1, 1)
+    bufferDirtyFlags.header = false
+  end
 
   -- Render craftables (left half)
-  renderCraftableData(results, startIdx, endIdx, page)
-  gpu.bitblt(0, 4, 1, craftableWidth, craftableHeight, craftableBuffer, 1, 1)
+  if bufferDirtyFlags.craftable then
+    renderCraftableData(results, startIdx, endIdx, page)
+    gpu.bitblt(0, 1, 4, craftableWidth, craftableHeight, craftableBuffer, 1, 1)
+    bufferDirtyFlags.craftable = false
+  end
 
   -- Render crafting status (right half)
-  renderCraftingStatus()
-  gpu.bitblt(0, 4, craftableWidth + 1, craftingStatusWidth, craftingStatusHeight, craftingStatusBuffer, 1, 1)
+  if bufferDirtyFlags.craftingStatus then
+    renderCraftingStatus()
+    gpu.bitblt(0, craftableWidth + 1, headerHeight, craftingStatusWidth, craftingStatusHeight, craftingStatusBuffer, 1, 1)
+    bufferDirtyFlags.craftingStatus = false
+  end
 
   -- Render debug info
-  renderDebugInfo(debugLogs)
-  gpu.bitblt(0, craftableHeight + 4, 1, debugWidth, debugHeight, debugBuffer, 1, 1)
+  if bufferDirtyFlags.debug then
+    renderDebugInfo(debugLogs)
+    gpu.bitblt(0, 1, craftableHeight + 4, debugWidth, debugHeight, debugBuffer, 1, 1)
+    bufferDirtyFlags.debug = false
+  end
 
   -- Render input bar
-  renderInputBar(input or "")
-  gpu.bitblt(0, termHeight, 1, inputWidth, inputHeight, inputBuffer, 1, 1)
+  if bufferDirtyFlags.input then
+    renderInputBar(input or "")
+    gpu.bitblt(0, 1, termHeight, inputWidth, inputHeight, inputBuffer, 1, 1)
+    bufferDirtyFlags.input = false
+  end
 
   gpu.setActiveBuffer(0)
 end
