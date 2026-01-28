@@ -171,41 +171,51 @@ local function addDebugLog(message, logType)
   bufferDirtyFlags.debug = true
 end
 
-local function getStock(nameOrFluidName, damage)
-  -- Try item lookup first
-  local item = me.getItemInNetwork(nameOrFluidName, damage)
-  if item and item.size then
-    addDebugLog("Lookup stock for item: " .. nameOrFluidName .. ", found: " .. item.size)
-    return item.size
-  end
-  -- Try fluids with cache
-  local now = os.clock()
-  if not fluidsCache.data or (now - fluidsCache.time > FLUIDS_CACHE_TTL) then
-    fluidsCache.data = me.getFluidsInNetwork()
-    fluidsCache.time = now
-    addDebugLog("Updated fluids cache")
-  end
-  local fluids = fluidsCache.data
-  if fluids then
-    for _, f in ipairs(fluids) do
-      if f.fluidName and f.fluidName == nameOrFluidName then
-        addDebugLog("Lookup fluid stock for: " .. nameOrFluidName .. ", found: " .. (f.amount or 0))
-        return f.amount or 0
+local function getStock(nameOrFluidName, damage, isFluid)
+  if isFluid then
+    -- Fluid lookup by name using getFluidsInNetwork
+    local now = os.clock()
+    if not fluidsCache.data or (now - fluidsCache.time > FLUIDS_CACHE_TTL) then
+      fluidsCache.data = me.getFluidsInNetwork()
+      fluidsCache.time = now
+      addDebugLog("Updated fluids cache")
+    end
+    local fluids = fluidsCache.data
+    if fluids then
+      for _, f in ipairs(fluids) do
+        if f.name == nameOrFluidName then
+          addDebugLog("Lookup fluid stock for: " .. nameOrFluidName .. ", found: " .. (f.amount or 0))
+          return f.amount or 0
+        end
       end
     end
+    addDebugLog("Lookup stock for fluid: " .. nameOrFluidName .. " not found")
+    return 0
+  else
+    -- Item lookup
+    local item = me.getItemInNetwork(nameOrFluidName, damage)
+    if item and item.size then
+      addDebugLog("Lookup stock for item: " .. nameOrFluidName .. ", found: " .. item.size)
+      return item.size
+    end
+    addDebugLog("Lookup stock for item: " .. nameOrFluidName .. " not found")
+    return 0
   end
-  addDebugLog("Lookup stock for item/fluid: " .. nameOrFluidName .. " not found")
-  return 0
 end
 
-local function getStockCached(unlocalizedName, damage)
-  local cacheKey = unlocalizedName .. "|" .. tostring(damage)
+local function getStockCached(nameOrFluidName, damage, isFluid)
+  local cacheKey
+  if isFluid then
+    cacheKey = "fluid|" .. nameOrFluidName
+  else
+    cacheKey = nameOrFluidName .. "|" .. tostring(damage)
+  end
   local now = os.clock()
   local entry = stockCache[cacheKey]
   if entry and (now - entry.time < STOCK_CACHE_TTL + math.random(0, STOCK_CACHE_TTL)) then -- Add jitter to cache expiration
     return entry.value
   else
-    local value = getStock(unlocalizedName, damage)
+    local value = getStock(nameOrFluidName, damage, isFluid)
     stockCache[cacheKey] = {value = value, time = now}
     return value
   end
@@ -213,9 +223,9 @@ end
 
 local function getCraftableStock(c)
   if c.fluidName then
-    return getStockCached(c.fluidName, 0) -- Use cached stock lookup for fluids
+    return getStockCached(c.name, 0, true) -- Use cached stock lookup for fluids by name
   end
-  return getStockCached(c.name, c.damage) -- Use cached stock lookup
+  return getStockCached(c.name, c.damage, false) -- Use cached stock lookup for items
 end
 
 local function printCraftingTracker()
