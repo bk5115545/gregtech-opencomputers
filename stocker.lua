@@ -223,7 +223,7 @@ end
 
 local function getCraftableStock(c)
   if c.fluidName then
-    return getStockCached(c.name, 0, true) -- Use cached stock lookup for fluids by name
+     return getStockCached(c.fluidName, 0, true) -- Use cached stock lookup for fluids by fluidName
   end
   return getStockCached(c.name, c.damage, false) -- Use cached stock lookup for items
 end
