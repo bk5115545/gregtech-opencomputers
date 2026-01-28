@@ -171,10 +171,11 @@ local function addDebugLog(message, logType)
   bufferDirtyFlags.debug = true
 end
 
-local function getStock(unlocalizedName, damage)
-  local item = me.getItemInNetwork(unlocalizedName, damage)
+local function getStock(nameOrFluidName, damage)
+  -- Try item lookup first
+  local item = me.getItemInNetwork(nameOrFluidName, damage)
   if item and item.size then
-    addDebugLog("Lookup stock for item: " .. unlocalizedName .. ", found: " .. item.size)
+    addDebugLog("Lookup stock for item: " .. nameOrFluidName .. ", found: " .. item.size)
     return item.size
   end
   -- Try fluids with cache
@@ -187,13 +188,13 @@ local function getStock(unlocalizedName, damage)
   local fluids = fluidsCache.data
   if fluids then
     for _, f in ipairs(fluids) do
-      if f.name == unlocalizedName then
-        addDebugLog("Lookup fluid stock for: " .. unlocalizedName .. ", found: " .. (f.amount or 0))
+      if f.fluidName and f.fluidName == nameOrFluidName then
+        addDebugLog("Lookup fluid stock for: " .. nameOrFluidName .. ", found: " .. (f.amount or 0))
         return f.amount or 0
       end
     end
   end
-  addDebugLog("Lookup stock for item: " .. unlocalizedName .. " not found")
+  addDebugLog("Lookup stock for item/fluid: " .. nameOrFluidName .. " not found")
   return 0
 end
 
@@ -211,14 +212,10 @@ local function getStockCached(unlocalizedName, damage)
 end
 
 local function getCraftableStock(c)
-  local stock = getStockCached(c.name, c.damage) -- Use cached stock lookup
-  if stock > 0 then
-    return stock
-  end
   if c.fluidName then
     return getStockCached(c.fluidName, 0) -- Use cached stock lookup for fluids
   end
-  return 0
+  return getStockCached(c.name, c.damage) -- Use cached stock lookup
 end
 
 local function printCraftingTracker()
@@ -645,6 +642,8 @@ local function runMainLoop()
     local input = getInputWithTimeout(termHeight, 10)
 
     if input == nil or input == "" then
+      search = ""
+      page = 1
       for k in pairs(bufferDirtyFlags) do
         bufferDirtyFlags[k] = true
       end
@@ -696,6 +695,8 @@ local function runMainLoop()
       if cmd == "a" then
         onlyTargets = not onlyTargets
         bufferDirtyFlags.craftable = true
+      elseif cmd == "c" then
+        currentlyCrafting = {}
       end
     else
       if search ~= input then
