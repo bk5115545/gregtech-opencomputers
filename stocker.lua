@@ -21,10 +21,10 @@ local STATUS_LIMIT = 10
 local lastInputTime = os.clock()
 
 local stockCache = {}
-local STOCK_CACHE_TTL = 60
+local STOCK_CACHE_TTL = 15
 
 local fluidsCache = {data = nil, time = 0}
-local FLUIDS_CACHE_TTL = 60
+local FLUIDS_CACHE_TTL = 30
 
 local debugEnabled = true
 
@@ -204,19 +204,23 @@ local function getStock(nameOrFluidName, damage, isFluid)
 end
 
 local function getStockCached(nameOrFluidName, damage, isFluid)
-  local cacheKey
-  if isFluid then
-    cacheKey = "fluid|" .. nameOrFluidName
-  else
-    cacheKey = nameOrFluidName .. "|" .. tostring(damage)
-  end
-  local now = os.clock()
+  local cacheKey = nameOrFluidName .. "|" .. tostring(damage)
+
+  local now = os.time() 
   local entry = stockCache[cacheKey]
-  if entry and (now - entry.time < STOCK_CACHE_TTL + math.random(0, STOCK_CACHE_TTL)) then -- Add jitter to cache expiration
+
+  if entry and (now < entry.expiresAt) then
     return entry.value
   else
     local value = getStock(nameOrFluidName, damage, isFluid)
-    stockCache[cacheKey] = {value = value, time = now}
+    
+    -- Calculate a random expiration window (jitter)
+    local jitter = math.random(0,0.5)
+    stockCache[cacheKey] = {
+      value = value, 
+      expiresAt = now + STOCK_CACHE_TTL * jitter
+    }
+    
     return value
   end
 end
@@ -271,7 +275,6 @@ local function requestManagerThread()
           os.sleep(0.060)
 
           local crafting = currentlyCrafting[key] and currentlyCrafting[key].amount or 0
-          addDebugLog("Found pattern for key: " .. key .. ", Stock: " .. stock .. ", Target: " .. target)
           local toRequest = target - (stock + crafting)
           if toRequest > 0 and not currentlyCrafting[key] then
             -- Check cooldown
@@ -286,7 +289,6 @@ local function requestManagerThread()
               local ok, req = pcall(craftable.request, reqAmount)
               os.sleep(0.060)
 
-              addDebugLog("Request result: " .. tostring(ok) .. ", " .. tostring(req), ok and "success" or "failure")
               if ok and req then
                 bufferDirtyFlags.craftingStatus = true
                 currentlyCrafting[key] = {tracker = req, amount = reqAmount, startTime = os.clock()}
@@ -300,7 +302,6 @@ local function requestManagerThread()
                     craftCooldowns[key] = nil
                   end
                 end
-                addDebugLog("Craft started for: " .. tostring(key), "success")
               elseif not ok then
                 -- Failure: set cooldown
                 local fails = (craftFailures[key] or 0) + 1
