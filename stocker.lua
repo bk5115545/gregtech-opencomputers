@@ -18,15 +18,15 @@ local PAGE_SIZE = 25
 local CRAFTABLE_LIMIT = 9999 -- Set higher for real use, lower for debug
 
 local STATUS_LIMIT = 10
-local lastInputTime = os.clock()
+local lastInputTime = os.clock()*100
 
 local stockCache = {}
 local STOCK_CACHE_TTL = 15
 
 local fluidsCache = {data = nil, time = 0}
-local FLUIDS_CACHE_TTL = 30
+local FLUIDS_CACHE_TTL = 5
 
-local debugEnabled = true
+local debugEnabled = false
 
 local colors = {
   white = 0xFFFFFF,
@@ -45,6 +45,9 @@ bufferDirtyFlags = {
 }
 
 component.gpu.setResolution(160, 50)
+
+print("Delaying startup. Press Control+Alt+C to exit")
+os.sleep(180)
 
 local function save()
   local file1 = io.open("/home/stockingLevels", "w")
@@ -66,6 +69,10 @@ local function load()
     batchSizes = serialization.unserialize(file2:read("*a")) or {}
     file2:close()
   end
+end
+
+local function time()
+  return os.clock()*100
 end
 
 local function formatNumberWithSuffix(number)
@@ -165,7 +172,7 @@ local function addDebugLog(message, logType)
   end
 
   table.insert(debugLogs, {message = message, color = color})
-  if #debugLogs > 100 then -- Limit the log size to the last 100 entries
+  if #debugLogs > 50 then -- Limit the log size to the last 100 entries
     table.remove(debugLogs, 1)
   end
   bufferDirtyFlags.debug = true
@@ -174,7 +181,7 @@ end
 local function getStock(nameOrFluidName, damage, isFluid)
   if isFluid then
     -- Fluid lookup by name using getFluidsInNetwork
-    local now = os.clock()
+    local now = time()
     if not fluidsCache.data or (now - fluidsCache.time > FLUIDS_CACHE_TTL) then
       fluidsCache.data = me.getFluidsInNetwork()
       fluidsCache.time = now
@@ -206,7 +213,7 @@ end
 local function getStockCached(nameOrFluidName, damage, isFluid)
   local cacheKey = nameOrFluidName .. "|" .. tostring(damage)
 
-  local now = os.time() 
+  local now = time() 
   local entry = stockCache[cacheKey]
 
   if entry and (now < entry.expiresAt) then
@@ -215,10 +222,10 @@ local function getStockCached(nameOrFluidName, damage, isFluid)
     local value = getStock(nameOrFluidName, damage, isFluid)
     
     -- Calculate a random expiration window (jitter)
-    local jitter = math.random(0,0.5)
+    local jitter = math.random(0,1.0)
     stockCache[cacheKey] = {
       value = value, 
-      expiresAt = now + STOCK_CACHE_TTL * jitter
+      expiresAt = now + STOCK_CACHE_TTL/2 + (STOCK_CACHE_TTL/2 * jitter)
     }
     
     return value
@@ -232,47 +239,22 @@ local function getCraftableStock(c)
   return getStockCached(c.name, c.damage, false) -- Use cached stock lookup for items
 end
 
-local function printCraftingTracker()
-  local trackerList = {}
-  for key, v in pairs(currentlyCrafting) do
-    local label, damage = key:match("^(.-)|(.+)$")
-    local elapsed = os.clock() - (v.startTime or 0)
-    trackerList[#trackerList+1] = {
-      key = key,
-      label = label,
-      damage = damage,
-      amount = v.amount,
-      elapsed = elapsed
-    }
-  end
-  table.sort(trackerList, function(a, b) return a.elapsed > b.elapsed end)
-  print("Active Crafts (oldest first):")
-  print("----------------------------------------------")
-  for i = 1, STATUS_LIMIT do
-    local t = trackerList[i]
-    if t then
-      print(string.format("%s [%s] x%d | %.1fs", t.label, t.damage, t.amount, t.elapsed))
-    else
-      print("")
-    end
-  end
-end
-
 local craftCooldowns = {}
 local craftFailures = {}
 
 local function requestManagerThread()
   while true do
-    local now = os.clock()
+    local now = time()
 
     for key, target in pairs(stockingLevels) do
+      os.sleep(0.5)
       if target and target > 0 then
         local craftable = craftableLookup[key]
         if not craftable then
           addDebugLog("No craftable found for key: " .. key)
         else
           local stock = getCraftableStock(craftable)
-          os.sleep(0.060)
+          os.sleep(0.100)
 
           local crafting = currentlyCrafting[key] and currentlyCrafting[key].amount or 0
           local toRequest = target - (stock + crafting)
@@ -287,11 +269,11 @@ local function requestManagerThread()
               local batch = batchSizes[key]
               local reqAmount = (batch and batch > 0) and batch or toRequest
               local ok, req = pcall(craftable.request, reqAmount)
-              os.sleep(0.060)
+              os.sleep(0.100)
 
               if ok and req then
                 bufferDirtyFlags.craftingStatus = true
-                currentlyCrafting[key] = {tracker = req, amount = reqAmount, startTime = os.clock()}
+                currentlyCrafting[key] = {tracker = req, amount = reqAmount, startTime = time()}
                 craftFailures[key] = 0
                 -- Gradually reduce cooldown
                 if craftCooldowns[key] then
@@ -317,7 +299,7 @@ local function requestManagerThread()
     end
     
     for key, v in pairs(currentlyCrafting) do
-      os.sleep(0.060)
+      os.sleep(0.5)
       if v.tracker.isCanceled() or v.tracker.isDone() then
         bufferDirtyFlags.craftingStatus = true
         currentlyCrafting[key] = nil
@@ -332,7 +314,7 @@ local function requestManagerThread()
     end
 
     addDebugLog("Sleeping...")
-    os.sleep(10) -- Slow down craft progress checks
+    os.sleep(3) -- Slow down craft progress checks
   end
 end
 
@@ -457,7 +439,7 @@ local function renderCraftingStatus()
     table.insert(keys, key)
   end
   table.sort(keys, function(a, b)
-    return (os.clock() - (currentlyCrafting[a].startTime or 0)) > (os.clock() - (currentlyCrafting[b].startTime or 0))
+    return (time() - (currentlyCrafting[a].startTime or 0)) > (time() - (currentlyCrafting[b].startTime or 0))
   end)
 
   -- Header for columns
@@ -470,7 +452,7 @@ local function renderCraftingStatus()
   for _, key in ipairs(keys) do
     local v = currentlyCrafting[key]
     local label = key:match("^(.-)|")
-    local elapsed = os.clock() - (v.startTime or 0)
+    local elapsed = time() - (v.startTime or 0)
 
     -- Render item name in white
     gpu.setForeground(colors.white)
@@ -547,11 +529,11 @@ local function renderUI(search, page, results, startIdx, endIdx, termHeight, inp
   end
 
   -- Render crafting status (right half)
-  -- if bufferDirtyFlags.craftingStatus then
+  if bufferDirtyFlags.craftingStatus then
     renderCraftingStatus()
     gpu.bitblt(0, craftableWidth + 1, headerHeight, craftingStatusWidth, craftingStatusHeight, craftingStatusBuffer, 1, 1)
     bufferDirtyFlags.craftingStatus = false
-  -- end
+  end
 
   -- Render debug info
   if bufferDirtyFlags.debug then
@@ -576,10 +558,10 @@ local function getInputWithTimeout(termHeight, timeout)
   io.write("> ")
 
   local buffer = ""
-  local started = os.clock()
+  local started = time()
 
   while true do
-    local remaining = timeout - (os.clock() - started)
+    local remaining = timeout - (time() - started)
     if remaining <= 0 then
       return nil
     end
@@ -588,7 +570,7 @@ local function getInputWithTimeout(termHeight, timeout)
     if #ev == 0 then
       return nil
     end
-    started = os.clock()
+    started = time()
 
     local _, _, char, code = table.unpack(ev)
     if code == keyboard.keys.enter then
@@ -620,25 +602,11 @@ local function runMainLoop()
   local _, termHeight = term.getViewport()
   local onlyTargets = false
 
+  local results = searchCraftables("", onlyTargets)
   while true do
-    local results
 
     if debugEnabled then
       bufferDirtyFlags.debug = true -- Force debug buffer to be dirty in debug mode
-    end
-
-    if onlyTargets then
-      results = {}
-      for key, target in pairs(stockingLevels) do
-        if target and target > 0 then
-          local craftable = craftableLookup[key]
-          if craftable then
-            results[#results+1] = craftable
-          end
-        end
-      end
-    else
-      results = searchCraftables(search, onlyTargets)
     end
 
     local totalPages = math.max(1, math.ceil(#results / PAGE_SIZE))
@@ -677,8 +645,9 @@ local function runMainLoop()
           batchSizes[key] = nil
         end
       end
-      bufferDirtyFlags.craftable = true
-      bufferDirtyFlags.input = true
+      for k in pairs(bufferDirtyFlags) do
+        bufferDirtyFlags[k] = true
+      end
     elseif input == ":q" then
       break
     elseif input == ":r" then
@@ -705,6 +674,7 @@ local function runMainLoop()
       local cmd = input:sub(2)
       if cmd == "a" then
         onlyTargets = not onlyTargets
+        results = searchCraftables(search, onlyTargets)
         bufferDirtyFlags.craftable = true
       elseif cmd == "c" then
         currentlyCrafting = {}
@@ -712,6 +682,7 @@ local function runMainLoop()
     else
       if search ~= input then
         search = input
+        results = searchCraftables(search, onlyTargets)
         page = 1
         bufferDirtyFlags.craftable = true
       end
