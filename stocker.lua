@@ -131,7 +131,7 @@ end
 -- Support k (thousands) and m (millions) and b/g (billions) suffixes for amount and batch
 local function parseAmount(str)
   if not str or str == "" then return nil end
-  local num, suffix = str:match("^(%d+)([kKmM]?)$")
+  local num, suffix = str:match("^(%d+)([kKmMbBgG]?)$")
   num = tonumber(num)
   if not num then return nil end
   if suffix == "k" or suffix == "K" then
