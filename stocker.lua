@@ -78,7 +78,7 @@ end
 local function formatNumberWithSuffix(number)
   if number >= 1000000000 then
     return string.format("%.1fb", number / 1000000000)
-  if number >= 1000000 then
+  elseif number >= 1000000 then
     return string.format("%.1fm", number / 1000000)
   elseif number >= 1000 then
     return string.format("%.1fk", number / 1000)
