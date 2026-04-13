@@ -126,7 +126,7 @@ local function getAllCraftables()
   bufferDirtyFlags.craftable = true
 end
 
--- Support k (thousands) and m (millions) suffixes for amount and batch
+-- Support k (thousands) and m (millions) and b/g (billions) suffixes for amount and batch
 local function parseAmount(str)
   if not str or str == "" then return nil end
   local num, suffix = str:match("^(%d+)([kKmM]?)$")
@@ -136,6 +136,8 @@ local function parseAmount(str)
     num = num * 1000
   elseif suffix == "m" or suffix == "M" then
     num = num * 1000000
+  elseif suffix == "g" or suffix == "G" or suffix == "b" or suffix == "B" then
+    num = num * 1000000000
   end
   return num
 end
