@@ -329,7 +329,7 @@ local function initializeBuffers()
   local w, h = gpu.getResolution()
 
   -- Header/Instructions Buffer
-  headerWidth, headerHeight = w, 3
+  headerWidth, headerHeight = w, 6
   headerBuffer = gpu.allocateBuffer(headerWidth, headerHeight)
 
   -- Craftables Buffer (Left Half)
@@ -373,6 +373,8 @@ local function renderHeader(search, page)
   y = y + 1
   gpu.setForeground(colors.white)
   gpu.set(1, y, "Type to search, :n/:p for next/prev page, :q to quit, :r to reload craftables, :s to save levels, :d to toggle debug, :a to show all targets, :u to force render")
+  y = y + 1
+  gpu.set(1, y, ":c for clear current crafts")
   y = y + 1
   gpu.set(1, y, string.format("%-43s %-10s %-10s %-10s", "Item", "Stock", "Target", "Crafting"))
   y = y + 1
@@ -528,21 +530,21 @@ local function renderUI(search, page, results, startIdx, endIdx, termHeight, inp
   -- Render craftables (left half)
   if bufferDirtyFlags.craftable then
     renderCraftableData(results, startIdx, endIdx, page)
-    gpu.bitblt(0, 1, 4, craftableWidth, craftableHeight, craftableBuffer, 1, 1)
+    gpu.bitblt(0, 1, headerHeight, craftableWidth, craftableHeight, craftableBuffer, 1, 1)
     bufferDirtyFlags.craftable = false
   end
 
   -- Render crafting status (right half)
   if bufferDirtyFlags.craftingStatus then
     renderCraftingStatus()
-    gpu.bitblt(0, craftableWidth + 1, headerHeight, craftingStatusWidth, craftingStatusHeight, craftingStatusBuffer, 1, 1)
+    gpu.bitblt(0, craftableWidth + 1, headerHeight - 2, craftingStatusWidth, craftingStatusHeight, craftingStatusBuffer, 1, 1)
     bufferDirtyFlags.craftingStatus = false
   end
 
   -- Render debug info
   if bufferDirtyFlags.debug then
     renderDebugInfo(debugLogs)
-    gpu.bitblt(0, 1, craftableHeight + 4, debugWidth, debugHeight, debugBuffer, 1, 1)
+    gpu.bitblt(0, 1, craftableHeight + 5, debugWidth, debugHeight, debugBuffer, 1, 1)
     bufferDirtyFlags.debug = false
   end
 
