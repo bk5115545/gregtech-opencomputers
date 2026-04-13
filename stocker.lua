@@ -7,6 +7,8 @@ local serialization = require("serialization")
 local event = require("event")
 local thread = require("thread")
 local keyboard = require("keyboard")
+local shell = require("shell")
+local args, options = shell.parse(...)
 
 local me = component.me_controller
 local craftablesList = {}
@@ -46,8 +48,13 @@ bufferDirtyFlags = {
 
 component.gpu.setResolution(160, 50)
 
-print("Delaying startup. Press Control+Alt+C to exit")
-os.sleep(180)
+if options.s then --You can use 'stocker.lua --s' to skip the startup delay
+  print("Skipping startup delay!")
+  os.sleep(5)
+else
+  print("Delaying startup. Press Control+Alt+C to exit")
+  os.sleep(180)
+end
 
 local function save()
   local file1 = io.open("/home/stockingLevels", "w")
@@ -76,7 +83,9 @@ local function time()
 end
 
 local function formatNumberWithSuffix(number)
-  if number >= 1000000 then
+  if number >= 1000000000 then
+    return string.format("%.1fb", number / 1000000000)
+  elseif number >= 1000000 then
     return string.format("%.1fm", number / 1000000)
   elseif number >= 1000 then
     return string.format("%.1fk", number / 1000)
@@ -124,18 +133,21 @@ local function getAllCraftables()
   table.sort(craftablesList, function(a, b) return a.label < b.label end)
   print("Done loading craftables.")
   bufferDirtyFlags.craftable = true
+  term.clear() --clearing the terminal so its clean for the further renders
 end
 
--- Support k (thousands) and m (millions) suffixes for amount and batch
+-- Support k (thousands) and m (millions) and b/g (billions) suffixes for amount and batch
 local function parseAmount(str)
   if not str or str == "" then return nil end
-  local num, suffix = str:match("^(%d+)([kKmM]?)$")
+  local num, suffix = str:match("^(%d+)([kKmMbBgG]?)$")
   num = tonumber(num)
   if not num then return nil end
   if suffix == "k" or suffix == "K" then
     num = num * 1000
   elseif suffix == "m" or suffix == "M" then
     num = num * 1000000
+  elseif suffix == "g" or suffix == "G" or suffix == "b" or suffix == "B" then
+    num = num * 1000000000
   end
   return num
 end
@@ -325,7 +337,7 @@ local function initializeBuffers()
   local w, h = gpu.getResolution()
 
   -- Header/Instructions Buffer
-  headerWidth, headerHeight = w, 3
+  headerWidth, headerHeight = w, 6
   headerBuffer = gpu.allocateBuffer(headerWidth, headerHeight)
 
   -- Craftables Buffer (Left Half)
@@ -369,6 +381,8 @@ local function renderHeader(search, page)
   y = y + 1
   gpu.setForeground(colors.white)
   gpu.set(1, y, "Type to search, :n/:p for next/prev page, :q to quit, :r to reload craftables, :s to save levels, :d to toggle debug, :a to show all targets, :u to force render")
+  y = y + 1
+  gpu.set(1, y, ":c for clear current crafts")
   y = y + 1
   gpu.set(1, y, string.format("%-43s %-10s %-10s %-10s", "Item", "Stock", "Target", "Crafting"))
   y = y + 1
@@ -524,21 +538,21 @@ local function renderUI(search, page, results, startIdx, endIdx, termHeight, inp
   -- Render craftables (left half)
   if bufferDirtyFlags.craftable then
     renderCraftableData(results, startIdx, endIdx, page)
-    gpu.bitblt(0, 1, 4, craftableWidth, craftableHeight, craftableBuffer, 1, 1)
+    gpu.bitblt(0, 1, headerHeight, craftableWidth, craftableHeight, craftableBuffer, 1, 1)
     bufferDirtyFlags.craftable = false
   end
 
   -- Render crafting status (right half)
   if bufferDirtyFlags.craftingStatus then
     renderCraftingStatus()
-    gpu.bitblt(0, craftableWidth + 1, headerHeight, craftingStatusWidth, craftingStatusHeight, craftingStatusBuffer, 1, 1)
+    gpu.bitblt(0, craftableWidth + 1, headerHeight - 2, craftingStatusWidth, craftingStatusHeight, craftingStatusBuffer, 1, 1)
     bufferDirtyFlags.craftingStatus = false
   end
 
   -- Render debug info
   if bufferDirtyFlags.debug then
     renderDebugInfo(debugLogs)
-    gpu.bitblt(0, 1, craftableHeight + 4, debugWidth, debugHeight, debugBuffer, 1, 1)
+    gpu.bitblt(0, 1, craftableHeight + 5, debugWidth, debugHeight, debugBuffer, 1, 1)
     bufferDirtyFlags.debug = false
   end
 
