@@ -7,6 +7,8 @@ local serialization = require("serialization")
 local event = require("event")
 local thread = require("thread")
 local keyboard = require("keyboard")
+local shell = require("shell")
+local args, options = shell.parse(...)
 
 local me = component.me_controller
 local craftablesList = {}
@@ -46,8 +48,13 @@ bufferDirtyFlags = {
 
 component.gpu.setResolution(160, 50)
 
-print("Delaying startup. Press Control+Alt+C to exit")
-os.sleep(180)
+if options.s then --You can use 'stocker.lua --s' to skip the startup delay
+  print("Skipping startup delay!")
+  os.sleep(5)
+else
+  print("Delaying startup. Press Control+Alt+C to exit")
+  os.sleep(180)
+end
 
 local function save()
   local file1 = io.open("/home/stockingLevels", "w")
@@ -126,6 +133,7 @@ local function getAllCraftables()
   table.sort(craftablesList, function(a, b) return a.label < b.label end)
   print("Done loading craftables.")
   bufferDirtyFlags.craftable = true
+  term.clear() --clearing the terminal so its clean for the further renders
 end
 
 -- Support k (thousands) and m (millions) and b/g (billions) suffixes for amount and batch
