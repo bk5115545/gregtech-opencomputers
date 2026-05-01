@@ -18,7 +18,7 @@ This will download and run the installer, which will automatically download all 
 An Applied Energistics auto-stocker that maintains stock levels of items in your ME system.
 
 **Requirements:**
-- ME Interface connected to your OpenComputer (via Adapter)
+- ME Controller connected to your OpenComputer (via Adapter)
 - Crafting patterns set up in your ME system for items you want to stock
 
 **Usage:**
